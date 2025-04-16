@@ -22,6 +22,7 @@ jemaine = ConversableAgent(
 chat_result = bret.initiate_chat(
     recipient = jemaine,
     message="Jemaine, tell me a joke.", 
+    max_turns=2
 )
 
 for msg in chat_result.chat_history:
