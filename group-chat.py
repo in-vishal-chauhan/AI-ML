@@ -1,4 +1,4 @@
-import autogen
+import autogen, pdb
 
 llm_config = {
     "model": "gemma-2-2b-it",
@@ -43,6 +43,8 @@ def state_transition(last_speaker, groupchat):
     elif last_speaker is coder:
         return executor
     elif last_speaker is executor:
+        print(messages[-1]["content"])
+        pdb.set_trace()
         if messages[-1]["content"] == "exitcode: 1":
             return coder
         else:
@@ -56,6 +58,7 @@ groupchat = autogen.GroupChat(
 )
 manager = autogen.GroupChatManager(groupchat=groupchat, llm_config=llm_config)
 
+userMessage = input("Give me a python coding question: ")
 initializer.initiate_chat(
-    manager, message="write code for make calculator."
+    manager, message=userMessage
 )
