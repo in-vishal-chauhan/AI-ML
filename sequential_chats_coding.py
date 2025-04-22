@@ -8,7 +8,7 @@ llm_config = {
     "model": "gemma-2-2b-it",
     "base_url": "http://127.0.0.1:1234/v1",
     "api_key": "lm-studio",
-    "price": [0, 0]
+    "price": [0,0]
 }
 
 onboarding_personal_information_agent = ConversableAgent(

@@ -24,6 +24,7 @@ chat_result = bret.initiate_chat(
     message="Jemaine, tell me a joke.", 
     max_turns=2
 )
+print(chat_result)
 
-for msg in chat_result.chat_history:
-    print(msg.get("content", ""))
+# for msg in chat_result.chat_history:
+#     print(msg.get("content", ""))
