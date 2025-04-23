@@ -18,7 +18,9 @@ inputAgent = autogen.ConversableAgent(
 outputAgent = autogen.ConversableAgent(
     name="OutputAgent",
     llm_config=llm_config,
-    system_message="Extract only valid color names (e.g., red, blue, black, green) from the received message. Do not include non-color words like 'cotton' or other descriptors. Respond with only the color names, one per line, with no additional text, explanation, or whitespace. If no valid colors are found, respond with 'None'.",
+    system_message="Extract only valid color names from the received message. " \
+                   "Do not include other descriptors. " \
+                   "Respond with only the color names, with no additional text, explanation, or whitespace. ",
     human_input_mode="NEVER"
 )
 
