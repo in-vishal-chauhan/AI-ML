@@ -18,9 +18,14 @@ inputAgent = autogen.ConversableAgent(
 outputAgent = autogen.ConversableAgent(
     name="OutputAgent",
     llm_config=llm_config,
-    system_message="Extract only valid color names from the received message. " \
-                   "Do not include other descriptors. " \
-                   "Respond with only the color names, with no additional text, explanation, or whitespace. ",
+    system_message="Extract these attributes from the message: "
+                   "color (e.g., red, blue, green, black, white), "
+                   "material (e.g., cotton, silk, polyester), "
+                   "quality (e.g., prime, premium, standard, high). "
+                   "Return a JSON object with only found attributes as key-value pairs (e.g., {\"color\": \"red\", \"material\": \"cotton\"}). "
+                   "Omit unfound attributes. Return {} if no attributes are found. "
+                   "Ignore words like 'shirt', 'tshirt', 'price', 'give', 'want'. "
+                   "Output only a valid JSON string, with no extra text, markup, or whitespace.",
     human_input_mode="NEVER"
 )
 
