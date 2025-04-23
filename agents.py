@@ -1,4 +1,5 @@
 import autogen
+import json
 
 llm_config = {
     "model": "gemma-2-2b-it",
@@ -18,21 +19,23 @@ inputAgent = autogen.ConversableAgent(
 outputAgent = autogen.ConversableAgent(
     name="OutputAgent",
     llm_config=llm_config,
-    system_message="Extract these attributes from the message: "
-                   "color (e.g., red, blue, green, black, white), "
-                   "material (e.g., cotton, silk, polyester), "
-                   "quality (e.g., prime, premium, standard, high). "
-                   "Return a JSON object with only found attributes as key-value pairs (e.g., {\"color\": \"red\", \"material\": \"cotton\"}). "
-                   "Omit unfound attributes. Return {} if no attributes are found. "
-                   "Ignore words like 'shirt', 'tshirt', 'price', 'give', 'want'. "
-                   "Output only a valid JSON string, with no extra text, markup, or whitespace.",
+    system_message="Take the provided color, material, and quality values. "
+                   "Return a JSON object with only non-empty attributes as key-value pairs (e.g., {\"color\": \"green\", \"material\": \"cotton\", \"quality\": \"prime\"}). "
+                   "Omit empty or missing attributes. Return {} if no attributes are provided. "
+                   "Output only a valid JSON string.",
     human_input_mode="NEVER"
 )
 
-user_input = input("Please enter a message: ")
+color = input("Enter color: ").strip()
+material = input("Enter material: ").strip()
+quality = input("Enter quality: ").strip()
 
+# Create a message with the inputs
+input_message = f"color: {color}, material: {material}, quality: {quality}"
+
+# Generate response from OutputAgent
 response = outputAgent.generate_reply(
-    messages=[{"content": user_input, "role": "user"}],
+    messages=[{"content": input_message, "role": "user"}],
     sender=inputAgent
 )
 
