@@ -6,8 +6,8 @@ from langchain.memory import ConversationBufferMemory
 from langchain.agents import initialize_agent, AgentType
 
 # Set your API keys securely (you can use .env in production)
-# os.environ["OPENAI_API_KEY"] = "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"
-# os.environ["SERPAPI_API_KEY"] = "54fe8a5b2230cebbbcd36bce50f589e462296dc998e09c05ca12ff5e1742e4c7"
+os.environ["OPENAI_API_KEY"] = "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"
+os.environ["SERPAPI_API_KEY"] = "54fe8a5b2230cebbbcd36bce50f589e462296dc998e09c05ca12ff5e1742e4c7"
 
 # Initialize ChatOpenAI (gpt-4 used to simulate gpt-4o-mini)
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
