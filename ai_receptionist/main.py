@@ -116,8 +116,6 @@ class AIReceptionist:
             return f"An error occurred: {str(e)}"
 
 
-# --- Main ---
-
 if __name__ == "__main__":
     groq = GroqAPI()
     db = Database()
