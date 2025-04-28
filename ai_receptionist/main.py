@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import os
 import re
 from flask import Flask, request, jsonify
+from twilio.rest import Client
 
 load_dotenv()
 
@@ -119,46 +120,31 @@ groq = GroqAPI()
 db = Database()
 receptionist = AIReceptionist(groq, db)
 
-def send_whatsapp_message(to_number, message_body):
-    whatsapp_api_url = os.getenv("WHATSAPP_API_URL")
-    whatsapp_api_token = os.getenv("WHATSAPP_API_TOKEN")
+def send_whatsapp_message(from_number, to_number, response_text):
+    account_sid = 'AC82d4df645ea7161b060e97d44de1ab73'
+    auth_token = 'bcac4174e0e34ec54789118adad89aaf'
+    client = Client(account_sid, auth_token)
 
-    headers = {
-        "Authorization": f"Bearer {whatsapp_api_token}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": to_number,
-        "type": "text",
-        "text": {
-            "body": message_body
-        }
-    }
-    response = requests.post(whatsapp_api_url, headers=headers, json=payload)
-    response.raise_for_status()
-    return response.json()
+    message = client.messages.create(
+        body=response_text,
+        from_=to_number,
+        to=from_number,
+    )
 
 @app.route("/webhook", methods=["POST"])
 def whatsapp_webhook():
-    data = request.json
-    print(data)
-    import pdb; pdb.set_trace()
     try:
-        user_query = data["messages"][0]["text"]["body"]
-        user_number = data["messages"][0]["from"]
-
-    except (KeyError, IndexError):
-        return jsonify({"error": "Invalid payload"}), 400
-
-    response_text = receptionist.handle_query(user_query)
-
-    try:
-        send_result = send_whatsapp_message(user_number, response_text)
-        print(f"Sent message: {response_text}")
-        return jsonify({"status": "success", "details": send_result}), 200
-    except Exception as e:
-        return jsonify({"error": f"Failed to send WhatsApp message: {str(e)}"}), 500
+        data = request.form.to_dict()
+        user_query = data.get("Body", "")
+        from_number = data.get("From", "")
+        to_number = data.get("To", "")
+        response_text = receptionist.handle_query(user_query)
+        try:
+            send_result = send_whatsapp_message(from_number, to_number, response_text)
+        except Exception as send_error:
+            pass
+    except Exception as general_error:
+        pass
 
 @app.route("/")
 def homepage():
