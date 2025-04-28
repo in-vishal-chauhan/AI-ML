@@ -4,9 +4,7 @@ import pymysql
 from dotenv import load_dotenv
 import os
 
-# Load environment variables
 load_dotenv()
-
 
 class GroqAPI:
     def __init__(self):
@@ -62,23 +60,29 @@ class AIReceptionist:
 
     def translate_to_english(self, user_query):
         system_prompt = """
-    You are a strict translator. 
-    ONLY translate non-English parts to English without guessing, adding, changing or improving words.
-    If the original text is already English, return it exactly as is.
-    DO NOT interpret, summarize, or rephrase. 
-    Just do literal translation, word by word.
-    """
-        print(self.groq_api.ask(system_prompt, user_query))
-        import pdb; pdb.set_trace()
+        You are a strict translator. 
+        ONLY translate non-English parts to English without guessing, adding, changing or improving words.
+        If the original text is already English, return it exactly as is.
+        DO NOT interpret, summarize, or rephrase. 
+        Just do literal translation, word by word.
+        """
         return self.groq_api.ask(system_prompt, user_query)
 
     def extract_parameters(self, english_query):
-        system_prompt = """You are an extractor. From the text, extract three things:
-- color
-- material
-- quality
-Return ONLY a JSON like this:
-{"color": "", "material": "", "quality": ""}"""
+        system_prompt = """
+        You are an extractor. From the text, extract three things:
+        - color
+        - material
+        - quality
+
+        Return ONLY a JSON like this:
+        {
+            "color": "",
+            "material": "",
+            "quality": ""
+        }
+        """
+
         extracted = self.groq_api.ask(system_prompt, english_query)
         return json.loads(extracted)
 
