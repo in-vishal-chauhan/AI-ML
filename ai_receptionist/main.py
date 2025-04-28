@@ -3,6 +3,7 @@ import json
 import pymysql
 from dotenv import load_dotenv
 import os
+import re
 
 load_dotenv()
 
@@ -40,9 +41,15 @@ class Database:
         self.cursor = self.conn.cursor()
 
     def get_rate(self, color, material, quality):
+        color = re.sub(r'[^a-zA-Z0-9]', '', color.lower())
+        material = re.sub(r'[^a-zA-Z0-9]', '', material.lower())
+        quality = re.sub(r'[^a-zA-Z0-9]', '', quality.lower())
         query = """
         SELECT rate FROM products
-        WHERE color = %s AND material = %s AND quality = %s
+        WHERE 
+            LOWER(REPLACE(REPLACE(REPLACE(color, ' ', ''), '-', ''), '_', '')) = %s
+            AND LOWER(REPLACE(REPLACE(REPLACE(material, ' ', ''), '-', ''), '_', '')) = %s
+            AND LOWER(REPLACE(REPLACE(REPLACE(quality, ' ', ''), '-', ''), '_', '')) = %s
         """
         self.cursor.execute(query, (color, material, quality))
         result = self.cursor.fetchone()
@@ -98,7 +105,6 @@ class AIReceptionist:
         try:
             english_query = self.translate_to_english(user_query)
             params = self.extract_parameters(english_query)
-
             color = params.get("color")
             material = params.get("material")
             quality = params.get("quality")
@@ -120,6 +126,6 @@ if __name__ == "__main__":
     try:
         user_query = input("User query (any language): ")
         response = receptionist.handle_query(user_query)
-        print("\n🤖 Response:\n", response)
+        print("Response: ", response)
     finally:
         db.close()
