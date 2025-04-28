@@ -121,15 +121,19 @@ db = Database()
 receptionist = AIReceptionist(groq, db)
 
 def send_whatsapp_message(from_number, to_number, response_text):
-    account_sid = 'AC82d4df645ea7161b060e97d44de1ab73'
-    auth_token = 'bcac4174e0e34ec54789118adad89aaf'
-    client = Client(account_sid, auth_token)
+    try:
+        account_sid = os.getenv('TWILIO_ACCOUNT_SID')
+        auth_token = os.getenv('TWILIO_AUTH_TOKEN')
+        client = Client(account_sid, auth_token)
 
-    message = client.messages.create(
-        body=response_text,
-        from_=to_number,
-        to=from_number,
-    )
+        message = client.messages.create(
+            body=response_text,
+            from_=to_number,
+            to=from_number,
+        )
+        return message.sid
+    except Exception as e:
+        return None
 
 @app.route("/webhook", methods=["POST"])
 def whatsapp_webhook():
@@ -138,13 +142,18 @@ def whatsapp_webhook():
         user_query = data.get("Body", "")
         from_number = data.get("From", "")
         to_number = data.get("To", "")
+        
         response_text = receptionist.handle_query(user_query)
-        try:
-            send_result = send_whatsapp_message(from_number, to_number, response_text)
-        except Exception as send_error:
-            pass
+
+        send_result = send_whatsapp_message(from_number, to_number, response_text)
+        
+        if send_result:
+            return jsonify({"message": "Message sent successfully!"}), 200
+        else:
+            return jsonify({"error": "Unable to process your request right now. Please try again later."}), 500
+
     except Exception as general_error:
-        pass
+        return jsonify({"error": f"Error in webhook handling: {str(general_error)}"}), 500
 
 @app.route("/")
 def homepage():
@@ -153,7 +162,6 @@ def homepage():
     <head><title>AI Receptionist</title></head>
     <body style="font-family: Arial, sans-serif; text-align: center; margin-top: 50px;">
         <h1>🤖 AI Receptionist is Running!</h1>
-        <p>Webhook Endpoint: <b>/webhook</b></p>
         <p>Send a message on WhatsApp to see it in action.</p>
     </body>
     </html>
