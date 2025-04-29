@@ -6,6 +6,8 @@ import os
 import re
 from flask import Flask, request, jsonify
 from twilio.rest import Client
+from faster_whisper import WhisperModel
+model = WhisperModel("base", compute_type="float32")
 
 load_dotenv()
 
@@ -135,23 +137,58 @@ def send_whatsapp_message(from_number, to_number, response_text):
     except Exception as e:
         return None
 
+def download_audio(media_url, save_path):
+    """Downloads audio file from Twilio Media URL."""
+    account_sid = os.getenv('TWILIO_ACCOUNT_SID')
+    auth_token = os.getenv('TWILIO_AUTH_TOKEN')
+    response = requests.get(media_url, auth=(account_sid, auth_token))
+    if response.status_code == 200:
+        with open(save_path, "wb") as f:
+            f.write(response.content)
+        return True
+    return False
+
+def transcribe_audio(file_path):
+    """Transcribes audio using faster-whisper."""
+    segments, info = model.transcribe(file_path, beam_size=5)
+    transcript = " ".join(segment.text for segment in segments)
+    return transcript, info.language
+
 @app.route("/webhook", methods=["POST"])
 def whatsapp_webhook():
     try:
         data = request.form.to_dict()
-        user_query = data.get("Body", "")
+        message_type = data.get("MessageType", "")
         from_number = data.get("From", "")
         to_number = data.get("To", "")
-        
-        response_text = receptionist.handle_query(user_query)
+        user_query = ""
+        audio_path = "./temp_audio.ogg"
 
-        send_result = send_whatsapp_message(from_number, to_number, response_text)
-        
-        if send_result:
-            return jsonify({"message": "Message sent successfully!"}), 200
+        if message_type == "audio":
+            media_url = data.get("MediaUrl0", "")
+            if not media_url:
+                return jsonify({"error": "No media URL found."}), 400
+            try:
+                if not download_audio(media_url, audio_path):
+                    return jsonify({"error": "Failed to download audio."}), 500
+                user_query, detected_language = transcribe_audio(audio_path)
+                response_text = receptionist.handle_query(user_query)
+                send_result = send_whatsapp_message(from_number, to_number, response_text)
+                if send_result:
+                    return jsonify({"message": "Message sent successfully!"}), 200
+                else:
+                    return jsonify({"error": "Unable to process your request right now. Please try again later."}), 500
+            finally:
+                if os.path.exists(audio_path):
+                    os.remove(audio_path)
         else:
-            return jsonify({"error": "Unable to process your request right now. Please try again later."}), 500
-
+            user_query = data.get("Body", "")
+            response_text = receptionist.handle_query(user_query)
+            send_result = send_whatsapp_message(from_number, to_number, response_text)
+            if send_result:
+                return jsonify({"message": "Message sent successfully!"}), 200
+            else:
+                return jsonify({"error": "Unable to process your request right now. Please try again later."}), 500
     except Exception as general_error:
         return jsonify({"error": f"Error in webhook handling: {str(general_error)}"}), 500
 
