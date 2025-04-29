@@ -9,12 +9,11 @@ from twilio.rest import Client
 from faster_whisper import WhisperModel
 model = WhisperModel("base", compute_type="float32")
 import logging
-import uuid
 
 logging.basicConfig(
-    filename=f"{uuid.uuid4()}.log",
+    filename="webhook.log",
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(levelname)s - Line %(lineno)d - %(message)s"
 )
 load_dotenv()
 app = Flask(__name__)
@@ -141,6 +140,7 @@ def send_whatsapp_message(from_number, to_number, response_text):
         )
         return message.sid
     except Exception as e:
+        logging.error(f"Failed to send message: {str(e)}")
         return None
 
 def download_audio(media_url, save_path):
@@ -162,41 +162,52 @@ def transcribe_audio(file_path):
 
 @app.route("/webhook", methods=["POST"])
 def whatsapp_webhook():
+    audio_path = "./temp_audio.ogg"
     try:
-        data = request.form.to_dict()
-        message_type = data.get("MessageType", "")
+        # Support both form and JSON (for flexibility)
+        data = request.form.to_dict() or request.get_json() or {}
+
+        message_type = data.get("MessageType", "").lower()
         from_number = data.get("From", "")
         to_number = data.get("To", "")
         user_query = ""
-        audio_path = "./temp_audio.ogg"
 
         if message_type == "audio":
             media_url = data.get("MediaUrl0", "")
             if not media_url:
+                logging.error("No media URL found in request.")
                 return jsonify({"error": "No media URL found."}), 400
+
+            if not download_audio(media_url, audio_path):
+                logging.error("Failed to download audio from URL.")
+                return jsonify({"error": "Failed to download audio."}), 500
+
             try:
-                if not download_audio(media_url, audio_path):
-                    return jsonify({"error": "Failed to download audio."}), 500
                 user_query, detected_language = transcribe_audio(audio_path)
-                logging.info(f"user_query: {user_query}")
-                response_text = receptionist.handle_query(user_query)
-                send_result = send_whatsapp_message(from_number, to_number, response_text)
-                if send_result:
-                    return jsonify({"message": "Message sent successfully!"}), 200
-                else:
-                    return jsonify({"error": "Unable to process your request right now. Please try again later."}), 500
+                logging.info(f"Transcribed query: {user_query} | Language: {detected_language}")
             finally:
                 if os.path.exists(audio_path):
                     os.remove(audio_path)
+
         else:
             user_query = data.get("Body", "")
-            response_text = receptionist.handle_query(user_query)
-            send_result = send_whatsapp_message(from_number, to_number, response_text)
-            if send_result:
-                return jsonify({"message": "Message sent successfully!"}), 200
-            else:
-                return jsonify({"error": "Unable to process your request right now. Please try again later."}), 500
+            logging.info(f"Received text query: {user_query}")
+
+        if not user_query:
+            logging.warning("Empty user query received.")
+            return jsonify({"error": "Empty query."}), 400
+
+        response_text = receptionist.handle_query(user_query)
+        logging.info(f"Response generated: {response_text}")
+
+        if send_whatsapp_message(from_number, to_number, response_text):
+            return jsonify({"message": "Message sent successfully!"}), 200
+        else:
+            logging.error("Failed to send message back to user.")
+            return jsonify({"error": "Unable to process your request right now. Please try again later."}), 500
+
     except Exception as general_error:
+        logging.exception("Unhandled exception occurred:")
         return jsonify({"error": f"Error in webhook handling: {str(general_error)}"}), 500
 
 @app.route("/")
@@ -212,4 +223,4 @@ def homepage():
     """
 
 if __name__ == "__main__":
-    app.run(port=5000)
+    app.run(port=5000,debug=True)
