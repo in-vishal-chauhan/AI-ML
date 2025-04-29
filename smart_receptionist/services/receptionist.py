@@ -43,9 +43,18 @@ class AIReceptionist:
                 params.get("material", ""),
                 params.get("quality", "")
             )
+
+            required_fields = ['color', 'material', 'quality']
+            extracted_fields = {field: params.get(field) for field in required_fields if params.get(field)}
+            missing_fields = [field for field in required_fields if not params.get(field)]
+            if missing_fields:
+                missing_list = ', '.join(missing_fields)
+                extracted_list = ', '.join(f"{k}: {v}" for k, v in extracted_fields.items())
+                return f"Sorry, the following details are missing: {missing_list}. Extracted values: {extracted_list or 'None'}. Please provide the missing information to get the rate."
             if rate:
                 return f"The rate for {params['color']}, {params['material']}, {params['quality']} is ₹{rate}."
             return f"Sorry, we couldn't find the rate for {params['color']}, {params['material']}, {params['quality']}."
+
         except Exception as e:
             logger.error(f"handle_query failed: {str(e)}")
             return "An error occurred while processing your request."
