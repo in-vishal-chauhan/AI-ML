@@ -9,9 +9,10 @@ from twilio.rest import Client
 from faster_whisper import WhisperModel
 model = WhisperModel("base", compute_type="float32")
 import logging
+import uuid
 
 logging.basicConfig(
-    filename="info.log",
+    filename=f"{uuid.uuid4()}.log",
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
@@ -155,7 +156,7 @@ def download_audio(media_url, save_path):
 
 def transcribe_audio(file_path):
     """Transcribes audio using faster-whisper."""
-    segments, info = model.transcribe(file_path, beam_size=5)
+    segments, info = model.transcribe(file_path, beam_size=5, language="en")
     transcript = " ".join(segment.text for segment in segments)
     return transcript, info.language
 
