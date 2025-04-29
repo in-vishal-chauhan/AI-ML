@@ -8,9 +8,14 @@ from flask import Flask, request, jsonify
 from twilio.rest import Client
 from faster_whisper import WhisperModel
 model = WhisperModel("base", compute_type="float32")
+import logging
 
+logging.basicConfig(
+    filename="info.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 load_dotenv()
-
 app = Flask(__name__)
 
 class GroqAPI:
@@ -172,6 +177,7 @@ def whatsapp_webhook():
                 if not download_audio(media_url, audio_path):
                     return jsonify({"error": "Failed to download audio."}), 500
                 user_query, detected_language = transcribe_audio(audio_path)
+                logging.info(f"user_query: {user_query}")
                 response_text = receptionist.handle_query(user_query)
                 send_result = send_whatsapp_message(from_number, to_number, response_text)
                 if send_result:
