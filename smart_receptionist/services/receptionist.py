@@ -10,13 +10,27 @@ class AIReceptionist:
 
     def translate_to_english(self, text):
         system_prompt = """
-        You are a strict translator...
+        You are a strict translator. 
+        ONLY translate non-English parts to English without guessing, adding, changing or improving words.
+        If the original text is already English, return it exactly as is.
+        DO NOT interpret, summarize, or rephrase. 
+        Just do literal translation, word by word.
         """
         return self.groq_api.ask(system_prompt, text)
 
     def extract_parameters(self, english_text):
         system_prompt = """
-        You are an extractor...
+        You are an extractor. From the text, extract three things:
+        - color
+        - material
+        - quality
+
+        Return ONLY a JSON like this:
+        {
+            "color": "",
+            "material": "",
+            "quality": ""
+        }
         """
         return json.loads(self.groq_api.ask(system_prompt, english_text))
 
