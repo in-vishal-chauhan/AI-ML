@@ -24,8 +24,9 @@ def webhook():
         user_query = ""
         from_number = data.get("From", "")
         to_number = data.get("To", "")
+        media_type = data.get("MediaContentType0", "")
 
-        if msg_type == "audio":
+        if msg_type == "audio" or (msg_type == "document" and media_type.startswith("audio/")):
             media_url = data.get("MediaUrl0")
             if download_audio(media_url, audio_path):
                 user_query, _ = transcribe_audio(audio_path)
