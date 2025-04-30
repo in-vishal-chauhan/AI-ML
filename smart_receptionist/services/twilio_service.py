@@ -21,6 +21,9 @@ def send_whatsapp_message(from_number, to_number, body, retry_count=0, max_retri
             threading.Timer(delay, send_whatsapp_message, args=(from_number, to_number, body, retry_count + 1, max_retries, delay)).start()
         else:
             logger.error("Max retries reached. Giving up.")
+            '''
+            In this case we store in db and then revert back when limit is restored
+            '''
         return None
 
 def download_audio(media_url, save_path):
