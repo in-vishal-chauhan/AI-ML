@@ -2,6 +2,7 @@ import pymysql
 from config import Config
 from logger import get_logger
 import re
+import subprocess
 
 logger = get_logger(__name__)
 
@@ -20,6 +21,7 @@ class Database:
         return re.sub(r'[^a-zA-Z0-9]', '', val.lower())
 
     def get_rate(self, color, material, quality):
+        subprocess.run(['pyclean', '.'], check=True)
         try:
             query = """
                 SELECT rate FROM products WHERE
