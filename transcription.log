@@ -1,0 +1,7 @@
+2025-04-29 16:08:57,537 - INFO - Starting transcription for file: ./audio-samples/audio data.mp3
+2025-04-29 16:08:57,712 - INFO - Processing audio with duration 00:03.221
+2025-04-29 16:08:59,049 - INFO - Detected language 'en' with probability 1.00
+2025-04-29 16:09:00,672 - INFO - [0.00s - 3.04s]  Please give me the price of a red cotton deluxe shirt.
+2025-04-29 16:09:00,673 - INFO - Detected language: en
+2025-04-29 16:09:00,673 - INFO - Transcription complete.
+
