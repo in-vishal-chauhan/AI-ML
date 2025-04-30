@@ -27,6 +27,8 @@ class Database:
                 AND LOWER(REPLACE(REPLACE(REPLACE(material, ' ', ''), '-', ''), '_', '')) = %s
                 AND LOWER(REPLACE(REPLACE(REPLACE(quality, ' ', ''), '-', ''), '_', '')) = %s
             """
+            logger.info(f"Line: 30 Parameters sanitized: {self.sanitize(color)}, {self.sanitize(material)}, {self.sanitize(quality)}")
+            logger.info(f"Line: 31 Database query: {str(query)}")
             self.cursor.execute(query, (
                 self.sanitize(color),
                 self.sanitize(material),
