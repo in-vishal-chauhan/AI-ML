@@ -8,7 +8,7 @@ logger = get_logger(__name__)
 
 client = Client(Config.TWILIO_ACCOUNT_SID, Config.TWILIO_AUTH_TOKEN)
 
-def send_whatsapp_message(from_number, to_number, body, retry_count=0, max_retries=3, delay=60):
+def send_whatsapp_message(from_number, to_number, body, retry_count=0, max_retries=3, delay=300):
     try:
         msg = client.messages.create(body=body, from_=to_number, to=from_number)
         logger.info(f"WhatsApp message sent successfully: {msg.sid}")
