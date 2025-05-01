@@ -40,7 +40,7 @@ def webhook():
             return jsonify({"error": "Empty input"}), 400
 
         response = receptionist.handle_query(user_query)
-        if send_whatsapp_message(from_number, to_number, response):
+        if send_whatsapp_message(from_number, to_number, response, payload=data):
             return jsonify({"message": "Sent!"}), 200
         else:
             return jsonify({"error": "Twilio failed"}), 500
