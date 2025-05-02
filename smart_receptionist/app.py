@@ -7,13 +7,15 @@ from services.groq_service import GroqAPI
 from services.database_service import Database
 from services.receptionist import AIReceptionist
 from logger import get_logger
+from services.document_qa_service import DocumentQAService
 
 app = Flask(__name__)
 logger = get_logger(__name__)
 
 groq = GroqAPI()
 db = Database()
-receptionist = AIReceptionist(groq, db)
+document_qa_service = DocumentQAService()
+receptionist = AIReceptionist(groq, db, document_qa_service)
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -39,7 +41,7 @@ def webhook():
         if not user_query:
             return jsonify({"error": "Empty input"}), 400
 
-        response = receptionist.handle_query(user_query)
+        response = receptionist.orchestrator(user_query)
         if send_whatsapp_message(from_number, to_number, response, payload=data):
             return jsonify({"message": "Sent!"}), 200
         else:
