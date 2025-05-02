@@ -3,6 +3,8 @@ import glob
 from docx import Document as DocxDocument
 import fitz
 import markdown
+from logger import get_logger
+logger = get_logger(__name__)
 
 class DocumentQAService:
     def __init__(self, documents_path="./documents"):
@@ -41,7 +43,8 @@ class DocumentQAService:
                 try:
                     texts.append(reader(file_path))
                 except Exception as e:
-                    print(f"Failed to load {file_path}: {e}")
+                    logger.error(f"Failed to read {file_path}: {e}")
+                    continue
 
         return texts
 
