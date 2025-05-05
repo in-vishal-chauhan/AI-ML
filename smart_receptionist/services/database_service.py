@@ -20,24 +20,36 @@ class Database:
     def sanitize(self, val):
         return re.sub(r'[^a-zA-Z0-9]', '', val.lower())
 
+    def generate_query(self, color, material, quality):
+        query = "SELECT * FROM products WHERE 1=1"
+        if color and color.strip() != "":
+            query += " AND LOWER(REPLACE(REPLACE(REPLACE(color, ' ', ''), '-', ''), '_', '')) = %s"
+        if material and material.strip() != "":
+            query += " AND LOWER(REPLACE(REPLACE(REPLACE(material, ' ', ''), '-', ''), '_', '')) = %s"
+        if quality and quality.strip() != "":
+            query += " AND LOWER(REPLACE(REPLACE(REPLACE(quality, ' ', ''), '-', ''), '_', '')) = %s"
+        logger.info(f"Generated SQL query: {query}")
+        return query
+
     def get_rate(self, color, material, quality):
         subprocess.run(['pyclean', '.'], check=True)
         try:
-            query = """
-                SELECT rate FROM products WHERE
-                LOWER(REPLACE(REPLACE(REPLACE(color, ' ', ''), '-', ''), '_', '')) = %s
-                AND LOWER(REPLACE(REPLACE(REPLACE(material, ' ', ''), '-', ''), '_', '')) = %s
-                AND LOWER(REPLACE(REPLACE(REPLACE(quality, ' ', ''), '-', ''), '_', '')) = %s
-            """
-            logger.info(f"Line: 30 Parameters sanitized: {self.sanitize(color)}, {self.sanitize(material)}, {self.sanitize(quality)}")
-            logger.info(f"Line: 31 Database query: {str(query)}")
-            self.cursor.execute(query, (
-                self.sanitize(color),
-                self.sanitize(material),
-                self.sanitize(quality)
-            ))
-            result = self.cursor.fetchone()
-            return result["rate"] if result else None
+            sanitizeColor = self.sanitize(color)
+            sanitizeMaterial = self.sanitize(material)
+            sanitizeQuality = self.sanitize(quality)
+            logger.info(f"Sanitized inputs: {sanitizeColor}, {sanitizeMaterial}, {sanitizeQuality}")
+            query = self.generate_query(sanitizeColor, sanitizeMaterial, sanitizeQuality)
+            params = []
+
+            if color and color.strip() != "":
+                params.append(sanitizeColor)
+            if material and material.strip() != "":
+                params.append(sanitizeMaterial)
+            if quality and quality.strip() != "":
+                params.append(sanitizeQuality)
+            self.cursor.execute(query, params)
+            result = self.cursor.fetchall()
+            return result if result else None
         except Exception as e:
             logger.error(f"DB get_rate() failed: {str(e)}")
             return None
