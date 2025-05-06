@@ -24,6 +24,9 @@ class EmailService:
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.sendmail(self.from_addr, to_addr, msg.as_string())
             return True
+        except smtplib.SMTPException as smtp_err:
+            logger.error(f"SMTP error while sending email to {to_addr}: {str(smtp_err)}")
+            return False
         except Exception as e:
-            logger.error(f"Failed to send email: {str(e)}")
+            logger.error(f"Unexpected error while sending email to {to_addr}: {str(e)}")
             return False
