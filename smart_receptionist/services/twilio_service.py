@@ -70,8 +70,8 @@ def download_audio(media_url, save_path):
                 f.write(res.content)
             return True
         else:
-            logger.error(f"Download failed: {res.status_code}")
+            logger.error(f"Download failed from {media_url}. HTTP Status Code: {res.status_code}.")
             return False
     except Exception as e:
-        logger.error(f"Download exception: {str(e)}")
+        logger.error(f"Unexpected error occurred while downloading audio from {media_url}: {str(e)}")
         return False
