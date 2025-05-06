@@ -150,7 +150,6 @@ class AIReceptionist:
                 }
             )
             data = response.json()
-            logger.info(f"Web query response: {data}")
             answer = data.get("Abstract") or data.get("Answer") or data.get("Definition")
 
             if answer:
