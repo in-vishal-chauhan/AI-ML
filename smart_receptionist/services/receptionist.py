@@ -22,7 +22,11 @@ class AIReceptionist:
         follow my instructions strictly.
         just focus on your task do not add any extra information or explanation.
         """
-        return self.groq_api.ask(system_prompt, text)
+        try:
+            return self.groq_api.ask(system_prompt, text)
+        except Exception as e:
+            logger.error(f"Translation failed for text: {text}\nError: {str(e)}")
+            raise
 
     def extract_parameters(self, english_text):
         system_prompt = """
@@ -50,13 +54,12 @@ class AIReceptionist:
         """
         try:
             response = self.groq_api.ask(system_prompt, english_text).strip()
-            logger.info(f"Extracted parameters: {response}")
             parsed = json.loads(response)
             filtered = {k: v for k, v in parsed.items() if v.strip()}
             return filtered
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error: {e} | Raw response: {response}")
-            return {}
+        except Exception as e:
+            logger.exception(f"Error occurred inside extract_parameters function: {str(e)}")
+            raise
     
     def orchestrator(self, user_input):
         system_prompt = """
@@ -65,37 +68,37 @@ class AIReceptionist:
         Your task is to decide whether the user's input is:
         - A generic query (e.g., greetings or general questions), or
         - A rate-related query (e.g., asking for prices or rates).
-        - Date-related query (current date, time, day)
-        - Web query (needs external information from internet like capital cities, who is Elon Musk, weather, temperature, etc.)
 
         Based on your decision, return ONLY one of these function names:
-        - handle_generic_query
-        - handle_query
-        - handle_date_query
-        - handle_web_query
+        - check_in_document
+        - check_in_db
 
         Do not explain. Just return the exact function name.
         """
 
-        function_name = self.groq_api.ask(system_prompt, user_input).strip()
-        return getattr(self, function_name)(user_input)
+        try:
+            function_name = self.groq_api.ask(system_prompt, user_input).strip()
+            return getattr(self, function_name)(user_input)
+        except Exception as e:
+            logger.exception(f"Error occurred inside orchestrator function: {str(e)}")
+            raise
 
-    def handle_query(self, user_input):
+    def check_in_db(self, user_input):
         try:
             translated = self.translate_to_english(user_input)
             params = self.extract_parameters(translated)
 
-            color = params.get("color", "")
-            material = params.get("material", "")
-            quality = params.get("quality", "")
+            color = params.get("color")
+            material = params.get("material")
+            quality = params.get("quality")
 
             if not (color or material or quality):
-                return "Please provide at least one of: color, material, or quality."
+                return "To help you better, please share at least one detail such as color, material, or quality."
 
             results = self.db.get_rate(color, material, quality)
 
             if not results:
-                return "No matching records found."
+                return "Sorry, I couldn't find any matching records. Please try refining your search."
 
             table_data = [
                 [r['color'], r['material'], r['quality'], f"{float(r['rate']):.2f}"]
@@ -110,56 +113,17 @@ class AIReceptionist:
                 colalign=("left", "left", "left", "right")
             )
 
-            return f"```\nHere are the matching rates:\n{table}\nTotal: {len(results)}\n```"
+            return f"```\nGreat! Here are the rates I found for you:\n\n{table}\n\nTotal matches: {len(results)}\n```"
 
         except Exception as e:
-            logger.error(f"handle_query failed: {str(e)}")
-            return "An error occurred while processing your request."
+            logger.error(f"Error occurred inside check_in_db function: {str(e)}")
+            return "Apologies, something went wrong while processing your request. We're looking into it — please try again shortly."
 
-    def handle_generic_query(self, user_input):
+
+    def check_in_document(self, user_input):
         try:
             translated = self.translate_to_english(user_input)
             return self.document_qa_service.query(translated, self.groq_api)
         except Exception as e:
-            logger.error(f"handle_generic_query failed: {str(e)}")
-            return "An error occurred while processing your request."
-    
-    def handle_date_query(self, user_input):
-        try:
-            now = datetime.now()
-            formatted_date = now.strftime("%A, %d %B %Y")
-            formatted_time = now.strftime("%I:%M %p")
-            return (
-                f"📅 Today is **{formatted_date}**.\n"
-                f"⏰ The current time is **{formatted_time}**.\n"
-                "Let me know if you need anything else!"
-            )
-        except Exception as e:
-            logger.error(f"handle_date_query failed: {str(e)}")
-            return "Oops! I couldn't fetch the current date and time. Please try again shortly."
-
-    def handle_web_query(self, user_input):
-        try:
-            response = requests.get(
-                "https://api.duckduckgo.com/",
-                params={
-                    "q": user_input,
-                    "format": "json",
-                    "no_redirect": 1,
-                    "no_html": 1
-                }
-            )
-            data = response.json()
-            answer = data.get("Abstract") or data.get("Answer") or data.get("Definition")
-
-            if answer:
-                return f"🔍 Here's what I found:\n\n{answer}\n\nLet me know if you'd like to dig deeper!"
-            else:
-                return (
-                    "Hmm... I couldn't find a direct answer to that 🤔.\n"
-                    "You might want to try rephrasing your question or ask something else!"
-                )
-
-        except Exception as e:
-            logger.error(f"handle_web_query failed: {str(e)}")
-            return "Sorry! I ran into an issue while looking that up. Please try again soon."
+            logger.error(f"Error occurred inside check_in_document function: {str(e)}")
+            return "Apologies, something went wrong while processing your request. We're looking into it — please try again shortly."
