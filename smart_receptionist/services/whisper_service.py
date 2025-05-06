@@ -7,9 +7,9 @@ model = WhisperModel("base", compute_type="float32")
 
 def transcribe_audio(file_path):
     try:
-        segments, info = model.transcribe(file_path, beam_size=5)
+        segments, information = model.transcribe(file_path, beam_size=5)
         transcript = " ".join([segment.text for segment in segments])
-        return transcript, info.language
+        return transcript, information.language
     except Exception as e:
         logger.error(f"Transcription failed: {str(e)}")
         raise

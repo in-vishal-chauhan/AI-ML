@@ -28,7 +28,6 @@ class Database:
             query += " AND LOWER(REPLACE(REPLACE(REPLACE(material, ' ', ''), '-', ''), '_', '')) = %s"
         if quality and quality.strip() != "":
             query += " AND LOWER(REPLACE(REPLACE(REPLACE(quality, ' ', ''), '-', ''), '_', '')) = %s"
-        logger.info(f"Generated SQL query: {query}")
         return query
 
     def get_rate(self, color, material, quality):
@@ -37,7 +36,6 @@ class Database:
             sanitizeColor = self.sanitize(color)
             sanitizeMaterial = self.sanitize(material)
             sanitizeQuality = self.sanitize(quality)
-            logger.info(f"Sanitized inputs: {sanitizeColor}, {sanitizeMaterial}, {sanitizeQuality}")
             query = self.generate_query(sanitizeColor, sanitizeMaterial, sanitizeQuality)
             params = []
 

@@ -23,7 +23,6 @@ class EmailService:
         try:
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.sendmail(self.from_addr, to_addr, msg.as_string())
-            logger.info("Email sent successfully!")
             return True
         except Exception as e:
             logger.error(f"Failed to send email: {str(e)}")
