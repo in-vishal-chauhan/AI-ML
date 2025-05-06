@@ -5,14 +5,26 @@ from logger import get_logger
 import threading
 from services.database_service import Database
 import json
+from services.email_service import EmailService
 
 logger = get_logger(__name__)
+emailService = EmailService()
 
 client = Client(Config.TWILIO_ACCOUNT_SID, Config.TWILIO_AUTH_TOKEN)
 
 def send_whatsapp_message(from_number, to_number, body, retry_count=0, max_retries=3, delay=60, payload=None):
     try:
         msg = client.messages.create(body=body, from_=to_number, to=from_number, force_delivery=True)
+        
+        # Send confirmation email
+        subject = "WhatsApp Message Sent Successfully"
+        email_body = f"Message SID: {msg.sid}\nMessage Body: {body}"
+        emailService.send_email(
+            to_addr=emailService.to_addr,
+            subject=subject,
+            body=email_body
+        )
+
         return msg.sid
     except Exception as e:
         attempt_number = retry_count + 1
@@ -27,6 +39,22 @@ def send_whatsapp_message(from_number, to_number, body, retry_count=0, max_retri
             try:
                 database.cursor.execute(insert_query, (from_number, to_number, body, json.dumps(payload)))
                 database.conn.commit()
+
+                subject = "WhatsApp Message Delivery Error"
+                email_body = (
+                    f"An error occurred while sending a WhatsApp message.\n\n"
+                    f"Details:\n"
+                    f"From: {from_number}\n"
+                    f"To: {to_number}\n"
+                    f"Message Body:\n{body}\n\n"
+                    f"Payload:\n{json.dumps(payload, indent=2)}"
+                )
+                emailService.send_email(
+                    to_addr=emailService.to_addr,
+                    subject=subject,
+                    body=email_body
+                )
+
                 logger.error(f"Failed to send WhatsApp message. Data inserted into database as a fallback.")
             except Exception as e:
                 logger.error(f"Failed to save fallback data into database after WhatsApp message failure. Error: {str(e)}")
