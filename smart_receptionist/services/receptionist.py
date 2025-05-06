@@ -97,15 +97,25 @@ class AIReceptionist:
             if not results:
                 return "No matching records found."
 
-            headers = {"color": "Color", "material": "Material", "quality": "Quality", "rate": "Rate"}
-            table = tabulate(results, headers=headers, tablefmt="fancy_grid")
+            table_data = [
+                [r['color'], r['material'], r['quality'], f"{float(r['rate']):.2f}"]
+                for r in results
+            ]
+            headers = ["Color", "Material", "Quality", "Rate"]
 
-            return table
+            table = tabulate(
+                table_data,
+                headers=headers,
+                tablefmt="fancy_grid",
+                colalign=("left", "left", "left", "right")
+            )
+
+            return f"```\nHere are the matching rates:\n{table}\nTotal: {len(results)}\n```"
 
         except Exception as e:
             logger.error(f"handle_query failed: {str(e)}")
             return "An error occurred while processing your request."
-    
+
     def handle_generic_query(self, user_input):
         try:
             translated = self.translate_to_english(user_input)
