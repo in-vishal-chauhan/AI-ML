@@ -36,13 +36,15 @@ def webhook():
                 user_query, _ = transcribe_audio(audio_path)
                 os.remove(audio_path)
             else:
-                return jsonify({"error": "Failed to download audio"}), 500
+                logger.error(f"Failed to download audio from URL: {media_url}")
+                return jsonify({"error": "Failed to download audio"}), 502
         else:
             # Handle text messages
             user_query = data.get("Body", "")
 
         if not user_query:
-            return jsonify({"error": "Empty input"}), 400
+            logger.error("Empty input received.")
+            return jsonify({"error": "Empty input received"}), 400
 
         # Process query with receptionist agent
         response = receptionist.orchestrator(user_query)
@@ -51,11 +53,12 @@ def webhook():
         if send_whatsapp_message(from_number, to_number, response, payload=data):
             return jsonify({"message": "Sent!"}), 200
         else:
-            return jsonify({"error": "Twilio failed"}), 500
+            logger.error(f"Failed to send WhatsApp message via Twilio. From: {from_number}, To: {to_number}, Payload: {data}")
+            return jsonify({"error": "Failed to send WhatsApp message"}), 502
 
     except Exception as e:
-        logger.exception("Webhook error:")
-        return jsonify({"error": str(e)}), 500
+        logger.exception(f"Unhandled exception during webhook processing: {str(e)}")
+        return jsonify({"error": "Unhandled exception during webhook processing"}), 500
 
 @app.route("/")
 def index():
