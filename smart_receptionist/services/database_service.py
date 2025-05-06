@@ -48,8 +48,11 @@ class Database:
             self.cursor.execute(query, params)
             result = self.cursor.fetchall()
             return result if result else None
+        except pymysql.MySQLError as e:
+            logger.error(f"MySQL error occurred while fetching rate: {str(e)}")
+            return None
         except Exception as e:
-            logger.error(f"DB get_rate() failed: {str(e)}")
+            logger.error(f"An error occurred while processing the request: {str(e)}")
             return None
 
     def close(self):
