@@ -46,11 +46,9 @@ class AIReceptionist:
 
     def extract_parameters(self, english_text):
         system_prompt = """
-        Persona:
         You are a precise field extractor that only returns structured JSON data.
 
-        Task:
-        From the given input text, extract the values for the following fields:
+        Your task is to extract values for the following fields from the input text:
         - color
         - material
         - quality
@@ -61,7 +59,7 @@ class AIReceptionist:
         - Do not include any extra text, comments, or explanations.
         - Output must be valid JSON that can be parsed using json.loads.
 
-        Output Format Example:
+        Output format:
         {
         "color": "",
         "material": "",
