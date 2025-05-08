@@ -13,3 +13,4 @@ class Config:
     DB_NAME = os.getenv("DB_NAME")
     ENDPOINT = os.getenv("ENDPOINT")
     MODEL = os.getenv("MODEL")
+    PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")

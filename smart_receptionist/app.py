@@ -6,7 +6,8 @@ from services.whisper_service import transcribe_audio
 from services.groq_service import GroqAPI
 from services.database_service import Database
 from services.receptionist import AIReceptionist
-from services.document_qa_service import DocumentQAService
+# from services.document_qa_service import DocumentQAService
+from services.read_store_vector import ReadStoreVector
 from logger import get_logger
 
 app = Flask(__name__)
@@ -15,8 +16,9 @@ logger = get_logger(__name__)
 # Initialize services
 groq = GroqAPI()
 db = Database()
-document_qa_service = DocumentQAService()
-receptionist = AIReceptionist(groq, db, document_qa_service)
+# document_qa_service = DocumentQAService()
+read_store_vector = ReadStoreVector()
+receptionist = AIReceptionist(groq, db, read_store_vector)
 
 @app.route("/webhook", methods=["POST"])
 def webhook():

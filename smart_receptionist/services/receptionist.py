@@ -3,24 +3,40 @@ from logger import get_logger
 from datetime import datetime
 import requests
 from tabulate import tabulate
+from services.pinecone_service import PineconeService
+from config import Config
 
 logger = get_logger(__name__)
 
 class AIReceptionist:
-    def __init__(self, groq_api, db, document_qa_service):
-        self.document_qa_service = document_qa_service
+    def __init__(self, groq_api, db, read_store_vector):
+        self.read_store_vector = read_store_vector
         self.groq_api = groq_api
         self.db = db
 
     def translate_to_english(self, text):
         system_prompt = """
-        You are a translator. Your task is to translate the given text into English.
-        Translate the text and return it in English.
-        If the text is already in English, return it as is. strip it and return. 
-        without any explanation. same as the input text.
-        if the text is not in English, return it in English.
-        follow my instructions strictly.
-        just focus on your task do not add any extra information or explanation.
+        You are a professional translator.
+        Your task is to translate any given input text into English.
+
+        If the text is already in English, return it exactly as it is, with leading and trailing whitespace removed.
+        If the text is not in English, translate it into proper English.
+        Do not add any explanations, comments, or additional information.
+        Do not mention that you are a translator or AI.
+        Return only the translated or original English text—nothing else.
+
+        Examples:
+        Input: ¿Cómo estás?
+        Output: How are you?
+
+        Input: what is your name?
+        Output: what is your name?
+
+        Input: Je m'appelle Pierre.
+        Output: My name is Pierre.
+
+        Input: हेलो, आप कैसे हैं?
+        Output: Hello, how are you?
         """
         try:
             return self.groq_api.ask(system_prompt, text)
@@ -123,7 +139,20 @@ class AIReceptionist:
     def check_in_document(self, user_input):
         try:
             translated = self.translate_to_english(user_input)
-            return self.document_qa_service.query(translated, self.groq_api)
+
+            API_KEY = Config.PINECONE_API_KEY
+            INDEX_NAME = "knowledge"
+            NAMESPACE = "knowledge"
+            service = PineconeService(api_key=API_KEY, index_name=INDEX_NAME, namespace=NAMESPACE)
+
+            if not service.pc.has_index(INDEX_NAME):
+                records = self.read_store_vector.query()
+                service.init_index()
+                service.upsert_documents(records)
+                return service.search(translated, 1)
+            else:
+                service.init_index()
+                return service.search(translated, 1)
         except Exception as e:
             logger.error(f"Error occurred inside check_in_document function: {str(e)}")
             return "Apologies, something went wrong while processing your request. We're looking into it — please try again shortly."
