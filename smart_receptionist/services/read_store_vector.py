@@ -53,6 +53,4 @@ class ReadStoreVector:
                 except Exception as e:
                     logger.error(f"Failed to read file {file_path}: {e}")
                     continue
-        logger.error(all_chunks)
-        exit(0)
-        # return all_chunks
+        return all_chunks
