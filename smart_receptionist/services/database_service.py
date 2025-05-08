@@ -18,7 +18,9 @@ class Database:
         self.cursor = self.conn.cursor()
 
     def sanitize(self, val):
-        return re.sub(r'[^a-zA-Z0-9]', '', val.lower())
+        if val:
+            return re.sub(r'[^a-zA-Z0-9]', '', val.lower())
+        return ''
 
     def generate_query(self, color, material, quality):
         query = "SELECT * FROM products WHERE 1=1"
