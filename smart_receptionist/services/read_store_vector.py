@@ -50,12 +50,7 @@ class ReadStoreVector:
 
                     file_name = os.path.splitext(os.path.basename(file_path))[0]
 
-                    record = [
-                        {
-                            "_id": file_name,
-                            "chunk_text": content,
-                        }
-                    ]
+                    record = [{"_id": file_name,"chunk_text": content}]
 
                     return record
                 except Exception as e:
