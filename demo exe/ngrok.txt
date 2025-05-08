@@ -1,0 +1,4 @@
+ngrok config add-authtoken 2wDcmsuIygAxlN5QrSfySMW7K1t_3t1VCXWZ3nHjTcTKNiHby
+
+ngrok http http://localhost:5000
+ngrok http --url=beloved-nearly-mudfish.ngrok-free.app 5000
