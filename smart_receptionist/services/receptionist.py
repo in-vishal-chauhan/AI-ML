@@ -173,10 +173,13 @@ class AIReceptionist:
             combined_context = "\n\n".join(all_chunks)
 
             prompt = f"""
-            Use the following context to answer the question.
+            You are a helpful assistant.
 
-            If you found a proper answer, respond politely and clearly.
-            If the answer cannot be found, respond politely that we currently do not have enough information.
+            Use the following context to answer the user's question.
+
+            - If the answer is clearly found in the context, respond politely with the relevant information.
+            - If the answer is not available, respond politely that the information is not currently in the knowledge base.
+            - Optionally, suggest the user try rephrasing the question.
 
             --- Context ---
             {combined_context}
