@@ -143,16 +143,50 @@ class AIReceptionist:
             API_KEY = Config.PINECONE_API_KEY
             INDEX_NAME = "knowledge"
             NAMESPACE = "knowledge"
+
             service = PineconeService(api_key=API_KEY, index_name=INDEX_NAME, namespace=NAMESPACE)
+            service.init_index()
 
             if not service.pc.has_index(INDEX_NAME):
-                records = self.read_store_vector.query()
-                service.init_index()
-                service.upsert_documents(records)
-                return service.search(translated, 1)
-            else:
-                service.init_index()
-                return service.search(translated, 1)
+                try:
+                    records = self.read_store_vector.query()
+                    service.upsert_documents(records)
+                except Exception as e:
+                    logger.error(f"Error during vector store upsertion: {str(e)}")
+                    return "Sorry, we couldn't load the knowledge base right now. Please try again later."
+
+            try:
+                response = service.search(translated, top_k=10)
+                return self.query_llm_with_chunks(response, self.groq_api, user_input)
+            except Exception as e:
+                logger.error(f"Error during Pinecone search: {str(e)}")
+                return "Sorry, there was an issue while searching for your answer. Please try again."
+
         except Exception as e:
-            logger.error(f"Error occurred inside check_in_document function: {str(e)}")
-            return "Apologies, something went wrong while processing your request. We're looking into it — please try again shortly."
+            logger.error(f"Error in check_in_document: {str(e)}")
+            return "Apologies, something went wrong while processing your request. Please try again shortly."
+
+
+    def query_llm_with_chunks(self, response, groq_api, user_input):
+        try:
+            all_chunks = [hit["fields"]["chunk_text"] for hit in response["result"]["hits"]]
+            combined_context = "\n\n".join(all_chunks)
+
+            prompt = f"""
+            Use the following context to answer the question.
+
+            If you found a proper answer, respond politely and clearly.
+            If the answer cannot be found, respond politely that we currently do not have enough information.
+
+            --- Context ---
+            {combined_context}
+            ----------------
+
+            Question: {user_input}
+            """
+
+            return groq_api.ask(prompt.strip(), user_input)
+
+        except Exception as e:
+            logger.error(f"Error in query_llm_with_chunks: {str(e)}")
+            return "Sorry, we couldn't generate a response at the moment. Please try again shortly."
