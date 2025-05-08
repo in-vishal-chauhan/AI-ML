@@ -145,17 +145,22 @@ class AIReceptionist:
             NAMESPACE = "knowledge"
 
             service = PineconeService(api_key=API_KEY, index_name=INDEX_NAME, namespace=NAMESPACE)
-            service.init_index()
 
             if not service.pc.has_index(INDEX_NAME):
                 try:
+                    service.init_index()
                     records = self.read_store_vector.query()
                     service.upsert_documents(records)
+                    import time
+                    time.sleep(10)
+                    response = service.search(translated, top_k=10)
+                    return self.query_llm_with_chunks(response, self.groq_api, user_input)
                 except Exception as e:
                     logger.error(f"Error during vector store upsertion: {str(e)}")
                     return "Sorry, we couldn't load the knowledge base right now. Please try again later."
 
             try:
+                service.init_index()
                 response = service.search(translated, top_k=10)
                 return self.query_llm_with_chunks(response, self.groq_api, user_input)
             except Exception as e:
