@@ -47,6 +47,7 @@ class AIReceptionist:
     def extract_parameters(self, english_text):
         system_prompt = """
         You are a precise field extractor that only returns structured JSON data.
+        carefully check all input text don't hallucinate the text just extract exact parameters.
 
         Your task is to extract values for the following fields from the input text:
         - color
@@ -61,9 +62,9 @@ class AIReceptionist:
 
         Output format:
         {
-        "color": "",
-        "material": "",
-        "quality": ""
+            "color": "",
+            "material": "",
+            "quality": ""
         }
         """
         try:
