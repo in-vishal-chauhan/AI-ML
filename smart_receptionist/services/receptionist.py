@@ -210,6 +210,8 @@ class AIReceptionist:
             ----------------
 
             Question: {user_input}
+
+            based on this data just give available info dont say not found for this or this context
             """
 
             return groq_api.ask(prompt.strip(), user_input)
