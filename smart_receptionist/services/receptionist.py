@@ -79,23 +79,65 @@ class AIReceptionist:
         system_prompt = """
         You are an orchestrator.
 
-        Your task is to decide whether the user's input is:
-        - A generic query (e.g., greetings or general questions), or
-        - A rate-related query (e.g., asking for prices or rates).
+        Your task is to decide which of the following functions are most suitable for handling the user's query.
 
-        Based on your decision, return ONLY one of these function names:
-        - check_in_document
-        - check_in_db
+        Functions:
+        - check_in_document: Use this when the user is asking about company-related information or details found in documents.
+        - check_in_db: Use this when the user is asking about prices, rates, or any data stored in the system.
+        - suggest_clothing_combination: Use this when the user wants suggestions for clothing colors, styles, or outfit combinations.
 
-        Do not explain. Just return the exact function name.
+        Return a comma-separated list of function names in order of relevance.
+
+        Do not explain your choices. Only output the function names like: check_in_db, suggest_clothing_combination
         """
 
+        tool_labels = {
+            "check_in_document": "Check for details about company",
+            "check_in_db": "Find rate in our system",
+            "suggest_clothing_combination": "Suggest a good clothing combination"
+        }
+
         try:
-            function_name = self.groq_api.ask(system_prompt, user_input).strip()
-            return getattr(self, function_name)(user_input)
+            tools_str = self.groq_api.ask(system_prompt, user_input).strip()
+
+            tools = []
+            for t in tools_str.split(","):
+                t = t.strip()
+                if t:
+                    tools.append(t)
+
+            if not tools:
+                return (
+                    "Sorry, I couldn't find the best tool for your request. Could you please rephrase or provide more details?"
+                )
+
+            full_response = "Results:\n"
+
+            for tool in tools:
+                label = tool_labels.get(tool, None)
+
+                if label is None:
+                    full_response += f"\nSorry, I couldn't recognize the tool '{tool}'. Skipping it."
+                    continue
+
+                choice = input(f"\nWould you like me to run '{label}' and show the result? (yes/no): ").strip().lower()
+
+                if choice == 'yes':
+                    try:
+                        result = getattr(self, tool)(user_input)
+                        full_response += f"\n🔧 {label} Result:\n{result}"
+                    except Exception as e:
+                        full_response += f"\nThere was an error running the '{label}' tool: {str(e)}"
+                elif choice == 'no':
+                    full_response += f"\nSkipped: {label}"
+                else:
+                    full_response += "\nSorry, I didn't understand your response. Skipping this tool."
+
+            return full_response.strip()
+
         except Exception as e:
-            logger.exception(f"Error occurred inside orchestrator function: {str(e)}")
-            raise
+            logger.exception("Error in orchestrator")
+            return "Something went wrong while processing your request. Please try again."
 
     def check_in_db(self, user_input):
         try:
@@ -196,3 +238,26 @@ class AIReceptionist:
         except Exception as e:
             logger.error(f"Error in query_llm_with_chunks: {str(e)}")
             return "Sorry, we couldn't generate a response at the moment. Please try again shortly."
+
+
+    def suggest_clothing_combination(self, user_input):
+        """
+        Uses the LLM to suggest a clothing color combination based on user's input.
+        """
+        system_prompt = """
+        You are a fashion assistant.
+
+        The user will describe what they are wearing or planning to wear.
+        Your job is to suggest the most suitable color combination for the rest of the outfit,
+        considering general fashion principles (contrast, complementarity, style harmony).
+
+        Respond with only the suggested clothing item and color. Do not explain.
+        Example format: "Navy blue pants", "White sneakers"
+        """
+
+        try:
+            suggestion = self.groq_api.ask(system_prompt, user_input).strip()
+            return suggestion
+        except Exception as e:
+            logger.error(f"Error in suggest_clothing_combination: {str(e)}")
+            return "Sorry, I couldn't come up with a suggestion right now."
