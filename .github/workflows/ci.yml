@@ -1,0 +1,4 @@
+- name: Deploy script (example)
+      run: |
+        echo "Running deployment..."
+        py smart_receptionist/app.py
