@@ -75,60 +75,52 @@ class AIReceptionist:
         except Exception as e:
             logger.exception(f"Error occurred inside extract_parameters function: {str(e)}")
             raise
-    
+
     def orchestrator(self, user_input):
         system_prompt = """
-        You are an AI orchestrator. Your job is to choose which functions should handle a user's request based on the description below.
+        You are an AI orchestrator. Choose the best functions for the user's request.
 
-        Available Functions:
-        - check_in_document: Use when the user asks about company-related information or anything found in documents.
-        - check_in_db: Use when the user asks about product prices, rates, or system data.
-        - suggest_clothing_combination: Use when the user wants outfit suggestions or clothing style ideas.
+        Functions:
+        - check_in_document: For company or document-related questions.
+        - check_in_db: For product prices, rates, or system data.
+        - suggest_clothing_combination: For outfit or clothing suggestions.
 
-        Respond with a comma-separated list of function names in order of relevance.
-        Do not add explanations. Only respond like: check_in_db, suggest_clothing_combination
+        Reply with function names, comma-separated. Example: check_in_db, suggest_clothing_combination
         """.strip()
 
         tool_labels = {
-            "check_in_document": "Company Information Lookup",
-            "check_in_db": "Product Rate Checker",
-            "suggest_clothing_combination": "Clothing Style Recommender"
+            "check_in_document": "Company Info",
+            "check_in_db": "Product Rates",
+            "suggest_clothing_combination": "Clothing Suggestions"
         }
-        user_input = user_input.strip()
 
         try:
             tools_str = self.groq_api.ask(system_prompt, user_input)
-
             tools = [t.strip() for t in tools_str.split(",") if t.strip()]
-
             if not tools:
-                return "Sorry, I didn’t get that. Could you please say it differently?"
+                return "Sorry, I didn’t get that. Can you say it another way?"
 
-            full_response = "Here's what I found:\n"
+            result_text = ""
 
-            for tool in tools:
+            for i, tool in enumerate(tools):
                 label = tool_labels.get(tool)
                 if not label:
-                    full_response += f"\nUnrecognized tool '{tool}'. Skipping."
                     continue
 
-                choice = input(f"\nWould you like to run '{label}'? (yes/no): ").strip().lower()
-                if choice == 'yes':
-                    try:
-                        result = getattr(self, tool)(user_input)
-                        full_response += f"\n {label}:\n{result}"
-                    except Exception as e:
-                        full_response += f"\n Error running '{label}': {str(e)}"
-                elif choice == 'no':
-                    full_response += f"\n Skipped: {label}"
+                if i == 0:
+                    result = getattr(self, tool)(user_input)
+                    result_text += f"{label}:\n{result}\n"
                 else:
-                    full_response += f"\n Didn't understand your response for '{label}'. Skipped."
+                    choice = input(f"Run '{label}' too? (yes/no): ").strip().lower()
+                    if choice == 'yes':
+                        result = getattr(self, tool)(user_input)
+                        result_text += f"\n{label}:\n{result}\n"
 
-            return full_response.strip()
+            return result_text.strip() or "We couldn’t find anything. Could you please rephrase or provide more details?"
 
         except Exception as e:
             logger.exception("Error in orchestrator")
-            return "Something went wrong while processing your request. Please try again."
+            return "Something went wrong. Please try again."
 
     def check_in_db(self, user_input):
         try:
