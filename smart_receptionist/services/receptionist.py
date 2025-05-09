@@ -77,61 +77,51 @@ class AIReceptionist:
     
     def orchestrator(self, user_input):
         system_prompt = """
-        You are an orchestrator.
+        You are an AI orchestrator. Your job is to choose which functions should handle a user's request based on the description below.
 
-        Your task is to decide which of the following functions are most suitable for handling the user's query.
+        Available Functions:
+        - check_in_document: Use when the user asks about company-related information or anything found in documents.
+        - check_in_db: Use when the user asks about product prices, rates, or system data.
+        - suggest_clothing_combination: Use when the user wants outfit suggestions or clothing style ideas.
 
-        Functions:
-        - check_in_document: Use this when the user is asking about company-related information or details found in documents.
-        - check_in_db: Use this when the user is asking about prices, rates, or any data stored in the system.
-        - suggest_clothing_combination: Use this when the user wants suggestions for clothing colors, styles, or outfit combinations.
-
-        Return a comma-separated list of function names in order of relevance.
-
-        Do not explain your choices. Only output the function names like: check_in_db, suggest_clothing_combination
-        """
+        Respond with a comma-separated list of function names in order of relevance.
+        Do not add explanations. Only respond like: check_in_db, suggest_clothing_combination
+        """.strip()
 
         tool_labels = {
-            "check_in_document": "Check for details about company",
-            "check_in_db": "Find rate in our system",
-            "suggest_clothing_combination": "Suggest a good clothing combination"
+            "check_in_document": "Company Information Lookup",
+            "check_in_db": "Product Rate Checker",
+            "suggest_clothing_combination": "Clothing Style Recommender"
         }
+        user_input = user_input.strip()
 
         try:
-            tools_str = self.groq_api.ask(system_prompt, user_input).strip()
+            tools_str = self.groq_api.ask(system_prompt, user_input)
 
-            tools = []
-            for t in tools_str.split(","):
-                t = t.strip()
-                if t:
-                    tools.append(t)
+            tools = [t.strip() for t in tools_str.split(",") if t.strip()]
 
             if not tools:
-                return (
-                    "Sorry, I couldn't find the best tool for your request. Could you please rephrase or provide more details?"
-                )
+                return "Sorry, I didn’t get that. Could you please say it differently?"
 
-            full_response = "Results:\n"
+            full_response = "Here's what I found:\n"
 
             for tool in tools:
-                label = tool_labels.get(tool, None)
-
-                if label is None:
-                    full_response += f"\nSorry, I couldn't recognize the tool '{tool}'. Skipping it."
+                label = tool_labels.get(tool)
+                if not label:
+                    full_response += f"\nUnrecognized tool '{tool}'. Skipping."
                     continue
 
-                choice = input(f"\nWould you like me to run '{label}' and show the result? (yes/no): ").strip().lower()
-
+                choice = input(f"\nWould you like to run '{label}'? (yes/no): ").strip().lower()
                 if choice == 'yes':
                     try:
                         result = getattr(self, tool)(user_input)
-                        full_response += f"\n🔧 {label} Result:\n{result}"
+                        full_response += f"\n {label}:\n{result}"
                     except Exception as e:
-                        full_response += f"\nThere was an error running the '{label}' tool: {str(e)}"
+                        full_response += f"\n Error running '{label}': {str(e)}"
                 elif choice == 'no':
-                    full_response += f"\nSkipped: {label}"
+                    full_response += f"\n Skipped: {label}"
                 else:
-                    full_response += "\nSorry, I didn't understand your response. Skipping this tool."
+                    full_response += f"\n Didn't understand your response for '{label}'. Skipped."
 
             return full_response.strip()
 
