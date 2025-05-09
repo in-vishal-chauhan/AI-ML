@@ -3,6 +3,7 @@ from logger import get_logger
 from tabulate import tabulate
 from services.pinecone_service import PineconeService
 from config import Config
+from datetime import datetime
 
 logger = get_logger(__name__)
 
@@ -85,6 +86,7 @@ class AIReceptionist:
         - check_in_document: For company or document-related questions.
         - check_in_db: For product prices, rates, or system data.
         - suggest_clothing_combination: For outfit or clothing suggestions.
+        - get_current_date: To get the current date.
 
         Reply with function names, comma-separated. Example: check_in_db, suggest_clothing_combination
         """.strip()
@@ -92,7 +94,8 @@ class AIReceptionist:
         tool_labels = {
             "check_in_document": "Company Info",
             "check_in_db": "Product Rates",
-            "suggest_clothing_combination": "Clothing Suggestions"
+            "suggest_clothing_combination": "Clothing Suggestions",
+            "get_current_date": "Current Date"
         }
 
         try:
@@ -112,7 +115,7 @@ class AIReceptionist:
             return "\n".join(results)
 
         except Exception as e:
-            logger.exception("Error in orchestrator")
+            logger.error(f"Error in orchestrator: {str(e)}")
             return "Something went wrong. Please try again."
 
 
@@ -240,3 +243,7 @@ class AIReceptionist:
         except Exception as e:
             logger.error(f"Error in suggest_clothing_combination: {str(e)}")
             return "Sorry, I couldn't come up with a suggestion right now."
+
+
+    def get_current_date(self, user_input=None):
+        return datetime.now().strftime("%A, %d %B %Y")
