@@ -66,5 +66,51 @@ def webhook():
 def index():
     return "<h1>AI Receptionist is running</h1>"
 
+@app.route("/logs")
+def show_logs():
+    log_path = 'webhook.log'
+    if not os.path.exists(log_path):
+        return "<h3>Log file not found.</h3>", 404
+
+    with open(log_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # HTML structure with styles for proper word wrapping and formatting
+    html = f"""
+    <html>
+    <head>
+        <style>
+            body {{
+                background: #f4f4f4;
+                color: #333;
+                font-family: 'Courier New', monospace;
+                padding: 20px;
+                margin: 0;
+            }}
+            h2 {{
+                color: #4CAF50;
+            }}
+            pre {{
+                background: #1e1e1e;
+                color: #f5f5f5;
+                padding: 15px;
+                border-radius: 8px;
+                border: 1px solid #444;
+                white-space: pre-wrap;       /* Wrap long lines */
+                word-wrap: break-word;      /* Break long words */
+                max-width: 100%;
+                overflow-x: auto;
+                font-size: 14px;
+            }}
+        </style>
+    </head>
+    <body>
+        <h2>📄 Application Logs</h2>
+        <pre>{content}</pre>
+    </body>
+    </html>
+    """
+    return html
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
