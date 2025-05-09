@@ -1,7 +1,5 @@
 import json
 from logger import get_logger
-from datetime import datetime
-import requests
 from tabulate import tabulate
 from services.pinecone_service import PineconeService
 from config import Config
