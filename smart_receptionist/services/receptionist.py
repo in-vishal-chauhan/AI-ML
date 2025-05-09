@@ -98,9 +98,7 @@ class AIReceptionist:
             tools_str = self.groq_api.ask(system_prompt, user_input)
             tools = [t.strip() for t in tools_str.split(",") if t.strip()]
             if not tools:
-                return "Sorry, I didn’t get that. Can you say it another way?"
-
-            result_text = ""
+                return "We couldn’t find anything. Could you please rephrase or provide more details?"
 
             for i, tool in enumerate(tools):
                 label = tool_labels.get(tool)
@@ -109,15 +107,13 @@ class AIReceptionist:
 
                 if i == 0:
                     result = getattr(self, tool)(user_input)
-                    result_text += f"{label}:\n{result}\n"
+                    print(f"\n{label}:\n{result}")
                 else:
-                    choice = input(f"Run '{label}' too? (yes/no): ").strip().lower()
+                    choice = input(f"\nWould you like to also check '{label}'? (yes/no): ").strip().lower()
                     if choice == 'yes':
                         result = getattr(self, tool)(user_input)
-                        result_text += f"\n{label}:\n{result}\n"
-
-            return result_text.strip() or "We couldn’t find anything. Could you please rephrase or provide more details?"
-
+                        print(f"\n{label}:\n{result}")
+            return
         except Exception as e:
             logger.exception("Error in orchestrator")
             return "Something went wrong. Please try again."
@@ -203,11 +199,15 @@ class AIReceptionist:
             prompt = f"""
             You are a helpful assistant.
 
-            Use the following context to answer the user's question.
+            Use only the information provided in the context to answer the user's question. Do not add explanations, assumptions, or commentary. Do not mention whether something was found or not.
 
-            - If the answer is clearly found in the context, respond politely with the relevant information.
-            - If the answer is not available, respond politely that the information is not currently in the knowledge base.
-            - Optionally, suggest the user try rephrasing the question.
+            Instructions:
+            - If the answer exists in the context, return it directly and clearly.
+            - If no answer is available, say nothing.
+            - Do not say things like “There is no information” or “That is not available.”
+            - Do not justify or explain your response.
+
+            Your response should include only what is relevant and found in the context.
 
             --- Context ---
             {combined_context}
@@ -224,18 +224,14 @@ class AIReceptionist:
 
 
     def suggest_clothing_combination(self, user_input):
-        """
-        Uses the LLM to suggest a clothing color combination based on user's input.
-        """
         system_prompt = """
-        You are a fashion assistant.
+        You’re a helpful fashion assistant.
 
-        The user will describe what they are wearing or planning to wear.
-        Your job is to suggest the most suitable color combination for the rest of the outfit,
-        considering general fashion principles (contrast, complementarity, style harmony).
+        The user will tell you what they’re wearing or planning to wear. Suggest one color that would go well with their outfit, based on good fashion sense—like matching, contrast, or style harmony.
 
-        Respond with only the suggested clothing item and color. Do not explain.
-        Example format: "Navy blue pants", "White sneakers"
+        Just reply with the color. No need to explain or mention any clothing items.
+
+        Example: "Olive green"
         """
 
         try:
