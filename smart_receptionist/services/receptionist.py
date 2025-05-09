@@ -14,6 +14,7 @@ class AIReceptionist:
         self.groq_api = groq_api
         self.db = db
 
+
     def translate_to_english(self, text):
         system_prompt = """
         You are a professional translator.
@@ -43,6 +44,7 @@ class AIReceptionist:
         except Exception as e:
             logger.error(f"Translation failed for text: {text}\nError: {str(e)}")
             raise
+
 
     def extract_parameters(self, english_text):
         system_prompt = """
@@ -75,6 +77,7 @@ class AIReceptionist:
         except Exception as e:
             logger.exception(f"Error occurred inside extract_parameters function: {str(e)}")
             raise
+
 
     def orchestrator(self, user_input):
         system_prompt = """
@@ -113,6 +116,7 @@ class AIReceptionist:
         except Exception as e:
             logger.exception("Error in orchestrator")
             return "Something went wrong. Please try again."
+
 
     def check_in_db(self, user_input):
         try:
