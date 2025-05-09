@@ -100,20 +100,16 @@ class AIReceptionist:
             if not tools:
                 return "We couldn’t find anything. Could you please rephrase or provide more details?"
 
-            for i, tool in enumerate(tools):
+            results = []
+            for tool in tools:
                 label = tool_labels.get(tool)
                 if not label:
                     continue
+                result = getattr(self, tool)(user_input)
+                results.append(f"\n{label}:\n{result}")
 
-                if i == 0:
-                    result = getattr(self, tool)(user_input)
-                    print(f"\n{label}:\n{result}")
-                else:
-                    choice = input(f"\nWould you like to also check '{label}'? (yes/no): ").strip().lower()
-                    if choice == 'yes':
-                        result = getattr(self, tool)(user_input)
-                        print(f"\n{label}:\n{result}")
-            return
+            return "\n".join(results)
+
         except Exception as e:
             logger.exception("Error in orchestrator")
             return "Something went wrong. Please try again."
