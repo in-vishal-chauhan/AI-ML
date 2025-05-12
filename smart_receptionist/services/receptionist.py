@@ -87,6 +87,7 @@ class AIReceptionist:
         - check_in_db: For product prices, rates, or system data.
         - suggest_clothing_combination: For outfit or clothing suggestions.
         - get_current_date: To get the current date.
+        - calculate_profit: For profit calculations.
 
         Reply with function names, comma-separated. Example: check_in_db, suggest_clothing_combination
         """.strip()
@@ -95,7 +96,8 @@ class AIReceptionist:
             "check_in_document": "Company Info",
             "check_in_db": "Product Rates",
             "suggest_clothing_combination": "Clothing Suggestions",
-            "get_current_date": "Current Date"
+            "get_current_date": "Current Date",
+            "calculate_profit": "Profit Calculation",
         }
 
         try:
@@ -105,13 +107,14 @@ class AIReceptionist:
                 return "We couldn’t find anything. Could you please rephrase or provide more details?"
 
             results = []
-            for tool in tools:
+            context = user_input
+            for key, tool in enumerate(tools):
                 label = tool_labels.get(tool)
                 if not label:
                     continue
-                result = getattr(self, tool)(user_input)
+                result = getattr(self, tool)(context)
                 results.append(f"\n{label}:\n{result}")
-
+                context += f"\n\n--- Result from {label} ---\n{result}\n"
             return "\n".join(results)
 
         except Exception as e:
@@ -247,3 +250,34 @@ class AIReceptionist:
 
     def get_current_date(self, user_input=None):
         return datetime.now().strftime("%A, %d %B %Y")
+    
+    def calculate_profit(self, user_input):
+        system_prompt = """
+        You are a smart profit calculator assistant.
+
+        The user will provide:
+        - A cost price (also referred to as "rate" or "base price")
+        - A desired profit percentage (e.g., "I want 20% profit")
+
+        Your job is to:
+        1. Extract the cost price and profit percentage from the input.
+        2. Calculate:
+        - Profit = cost_price * (profit_percent / 100)
+        - Selling Price = cost_price + profit
+        3. Reply in plain text using this format:
+
+        Cost Price = <cost_price>  
+        Profit Percentage = <profit_percent>  
+        Profit Amount = <profit_amount>  
+        Selling Price = <selling_price>
+
+        If cost price or profit percentage is missing, respond clearly asking the user to provide both values.
+        if table have many values then calculate for each item
+        """
+
+        try:
+            profitInfo = self.groq_api.ask(system_prompt, user_input).strip()
+            return profitInfo
+        except Exception as e:
+            logger.error(f"Error in calculate_profit: {str(e)}")
+            return "I couldn't calculate the profit. Please make sure to include both the cost price (e.g., 'rate is 100') and the profit percentage (e.g., 'want 20% profit') in your message."
