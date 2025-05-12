@@ -1,36 +1,56 @@
 import json
 from logger import get_logger
-from datetime import datetime
-import requests
 from tabulate import tabulate
+from services.pinecone_service import PineconeService
+from config import Config
+from datetime import datetime
 
 logger = get_logger(__name__)
 
 class AIReceptionist:
-    def __init__(self, groq_api, db, document_qa_service):
-        self.document_qa_service = document_qa_service
+    def __init__(self, groq_api, db, read_store_vector):
+        self.read_store_vector = read_store_vector
         self.groq_api = groq_api
         self.db = db
 
+
     def translate_to_english(self, text):
         system_prompt = """
-        You are a translator. Your task is to translate the given text into English.
-        Translate the text and return it in English.
-        If the text is already in English, return it as is. strip it and return. 
-        without any explanation. same as the input text.
-        if the text is not in English, return it in English.
-        follow my instructions strictly.
-        just focus on your task do not add any extra information or explanation.
+        You are a professional translator.
+        Your task is to translate any given input text into English.
+
+        If the text is already in English, return it exactly as it is, with leading and trailing whitespace removed.
+        If the text is not in English, translate it into proper English.
+        Do not add any explanations, comments, or additional information.
+        Do not mention that you are a translator or AI.
+        Return only the translated or original English text—nothing else.
+
+        Examples:
+        Input: ¿Cómo estás?
+        Output: How are you?
+
+        Input: what is your name?
+        Output: what is your name?
+
+        Input: Je m'appelle Pierre.
+        Output: My name is Pierre.
+
+        Input: हेलो, आप कैसे हैं?
+        Output: Hello, how are you?
         """
-        return self.groq_api.ask(system_prompt, text)
+        try:
+            return self.groq_api.ask(system_prompt, text)
+        except Exception as e:
+            logger.error(f"Translation failed for text: {text}\nError: {str(e)}")
+            raise
+
 
     def extract_parameters(self, english_text):
         system_prompt = """
-        Persona:
         You are a precise field extractor that only returns structured JSON data.
+        carefully check all input text don't hallucinate the text just extract exact parameters.
 
-        Task:
-        From the given input text, extract the values for the following fields:
+        Your task is to extract values for the following fields from the input text:
         - color
         - material
         - quality
@@ -41,61 +61,80 @@ class AIReceptionist:
         - Do not include any extra text, comments, or explanations.
         - Output must be valid JSON that can be parsed using json.loads.
 
-        Output Format Example:
+        Output format:
         {
-        "color": "",
-        "material": "",
-        "quality": ""
+            "color": "",
+            "material": "",
+            "quality": ""
         }
         """
         try:
             response = self.groq_api.ask(system_prompt, english_text).strip()
-            logger.info(f"Extracted parameters: {response}")
             parsed = json.loads(response)
             filtered = {k: v for k, v in parsed.items() if v.strip()}
             return filtered
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error: {e} | Raw response: {response}")
-            return {}
-    
+        except Exception as e:
+            logger.exception(f"Error occurred inside extract_parameters function: {str(e)}")
+            raise
+
+
     def orchestrator(self, user_input):
         system_prompt = """
-        You are an orchestrator.
+        You are an AI orchestrator. Choose the best functions for the user's request.
 
-        Your task is to decide whether the user's input is:
-        - A generic query (e.g., greetings or general questions), or
-        - A rate-related query (e.g., asking for prices or rates).
-        - Date-related query (current date, time, day)
-        - Web query (needs external information from internet like capital cities, who is Elon Musk, weather, temperature, etc.)
+        Functions:
+        - check_in_document: For company or document-related questions.
+        - check_in_db: For product prices, rates, or system data.
+        - suggest_clothing_combination: For outfit or clothing suggestions.
+        - get_current_date: To get the current date.
 
-        Based on your decision, return ONLY one of these function names:
-        - handle_generic_query
-        - handle_query
-        - handle_date_query
-        - handle_web_query
+        Reply with function names, comma-separated. Example: check_in_db, suggest_clothing_combination
+        """.strip()
 
-        Do not explain. Just return the exact function name.
-        """
+        tool_labels = {
+            "check_in_document": "Company Info",
+            "check_in_db": "Product Rates",
+            "suggest_clothing_combination": "Clothing Suggestions",
+            "get_current_date": "Current Date"
+        }
 
-        function_name = self.groq_api.ask(system_prompt, user_input).strip()
-        return getattr(self, function_name)(user_input)
+        try:
+            tools_str = self.groq_api.ask(system_prompt, user_input)
+            tools = [t.strip() for t in tools_str.split(",") if t.strip()]
+            if not tools:
+                return "We couldn’t find anything. Could you please rephrase or provide more details?"
 
-    def handle_query(self, user_input):
+            results = []
+            for tool in tools:
+                label = tool_labels.get(tool)
+                if not label:
+                    continue
+                result = getattr(self, tool)(user_input)
+                results.append(f"\n{label}:\n{result}")
+
+            return "\n".join(results)
+
+        except Exception as e:
+            logger.error(f"Error in orchestrator: {str(e)}")
+            return "Something went wrong. Please try again."
+
+
+    def check_in_db(self, user_input):
         try:
             translated = self.translate_to_english(user_input)
             params = self.extract_parameters(translated)
 
-            color = params.get("color", "")
-            material = params.get("material", "")
-            quality = params.get("quality", "")
+            color = params.get("color")
+            material = params.get("material")
+            quality = params.get("quality")
 
             if not (color or material or quality):
-                return "Please provide at least one of: color, material, or quality."
+                return "To help you better, please share at least one detail such as color, material, or quality."
 
             results = self.db.get_rate(color, material, quality)
 
             if not results:
-                return "No matching records found."
+                return "Sorry, I couldn't find any matching records. Please try refining your search."
 
             table_data = [
                 [r['color'], r['material'], r['quality'], f"{float(r['rate']):.2f}"]
@@ -110,56 +149,101 @@ class AIReceptionist:
                 colalign=("left", "left", "left", "right")
             )
 
-            return f"```\nHere are the matching rates:\n{table}\nTotal: {len(results)}\n```"
+            return f"```\nGreat! Here are the rates I found for you:\n\n{table}\n\nTotal matches: {len(results)}\n```"
 
         except Exception as e:
-            logger.error(f"handle_query failed: {str(e)}")
-            return "An error occurred while processing your request."
+            logger.error(f"Error occurred inside check_in_db function: {str(e)}")
+            return "Apologies, something went wrong while processing your request. We're looking into it — please try again shortly."
 
-    def handle_generic_query(self, user_input):
+
+    def check_in_document(self, user_input):
         try:
             translated = self.translate_to_english(user_input)
-            return self.document_qa_service.query(translated, self.groq_api)
+
+            API_KEY = Config.PINECONE_API_KEY
+            INDEX_NAME = "knowledge"
+            NAMESPACE = "knowledge"
+
+            service = PineconeService(api_key=API_KEY, index_name=INDEX_NAME, namespace=NAMESPACE)
+
+            if not service.pc.has_index(INDEX_NAME):
+                try:
+                    service.init_index()
+                    records = self.read_store_vector.query()
+                    service.upsert_documents(records)
+                    import time
+                    time.sleep(10)
+                    response = service.search(translated, top_k=10)
+                    return self.query_llm_with_chunks(response, self.groq_api, user_input)
+                except Exception as e:
+                    logger.error(f"Error during vector store upsertion: {str(e)}")
+                    return "Sorry, we couldn't load the knowledge base right now. Please try again later."
+
+            try:
+                service.init_index()
+                response = service.search(translated, top_k=10)
+                return self.query_llm_with_chunks(response, self.groq_api, user_input)
+            except Exception as e:
+                logger.error(f"Error during Pinecone search: {str(e)}")
+                return "Sorry, there was an issue while searching for your answer. Please try again."
+
         except Exception as e:
-            logger.error(f"handle_generic_query failed: {str(e)}")
-            return "An error occurred while processing your request."
-    
-    def handle_date_query(self, user_input):
+            logger.error(f"Error in check_in_document: {str(e)}")
+            return "Apologies, something went wrong while processing your request. Please try again shortly."
+
+
+    def query_llm_with_chunks(self, response, groq_api, user_input):
         try:
-            now = datetime.now()
-            formatted_date = now.strftime("%A, %d %B %Y")
-            formatted_time = now.strftime("%I:%M %p")
-            return (
-                f"📅 Today is **{formatted_date}**.\n"
-                f"⏰ The current time is **{formatted_time}**.\n"
-                "Let me know if you need anything else!"
-            )
-        except Exception as e:
-            logger.error(f"handle_date_query failed: {str(e)}")
-            return "Oops! I couldn't fetch the current date and time. Please try again shortly."
+            all_chunks = [hit["fields"]["chunk_text"] for hit in response["result"]["hits"]]
+            combined_context = "\n\n".join(all_chunks)
 
-    def handle_web_query(self, user_input):
+            prompt = f"""
+            You are a helpful assistant.
+
+            Use only the information provided in the context to answer the user's question. Do not add explanations, assumptions, or commentary. Do not mention whether something was found or not.
+
+            Instructions:
+            - If the answer exists in the context, return it directly and clearly.
+            - If no answer is available, say nothing.
+            - Do not say things like “There is no information” or “That is not available.”
+            - Do not justify or explain your response.
+
+            Your response should include only what is relevant and found in the context.
+
+            --- Context ---
+            {combined_context}
+            ----------------
+
+            Question: {user_input}
+
+            based on this data just give available info dont say not found for this or this context
+            """
+
+            return groq_api.ask(prompt.strip(), user_input)
+
+        except Exception as e:
+            logger.error(f"Error in query_llm_with_chunks: {str(e)}")
+            return "Sorry, we couldn't generate a response at the moment. Please try again shortly."
+
+
+    def suggest_clothing_combination(self, user_input):
+        system_prompt = """
+        You’re a helpful fashion assistant.
+
+        The user will tell you what they’re wearing or planning to wear. Suggest one color that would go well with their outfit, based on good fashion sense—like matching, contrast, or style harmony.
+
+        Just reply with the color. No need to explain or mention any clothing items.
+
+        Example: "Olive green"
+        """
+
         try:
-            response = requests.get(
-                "https://api.duckduckgo.com/",
-                params={
-                    "q": user_input,
-                    "format": "json",
-                    "no_redirect": 1,
-                    "no_html": 1
-                }
-            )
-            data = response.json()
-            answer = data.get("Abstract") or data.get("Answer") or data.get("Definition")
-
-            if answer:
-                return f"🔍 Here's what I found:\n\n{answer}\n\nLet me know if you'd like to dig deeper!"
-            else:
-                return (
-                    "Hmm... I couldn't find a direct answer to that 🤔.\n"
-                    "You might want to try rephrasing your question or ask something else!"
-                )
-
+            suggestion = self.groq_api.ask(system_prompt, user_input).strip()
+            return suggestion
         except Exception as e:
-            logger.error(f"handle_web_query failed: {str(e)}")
-            return "Sorry! I ran into an issue while looking that up. Please try again soon."
+            logger.error(f"Error in suggest_clothing_combination: {str(e)}")
+            return "Sorry, I couldn't come up with a suggestion right now."
+
+
+    def get_current_date(self, user_input=None):
+        return datetime.now().strftime("%A, %d %B %Y")

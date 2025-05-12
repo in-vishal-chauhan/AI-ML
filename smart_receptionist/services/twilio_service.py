@@ -25,7 +25,7 @@ def send_whatsapp_message(from_number, to_number, body, retry_count=0, max_retri
             body=email_body
         )
 
-        return msg.sid
+        return True
     except Exception as e:
         attempt_number = retry_count + 1
         logger.error(f"Twilio message failed (attempt {attempt_number}): {str(e)}")
@@ -55,12 +55,11 @@ def send_whatsapp_message(from_number, to_number, body, retry_count=0, max_retri
                     body=email_body
                 )
 
-                logger.error(f"Failed to send WhatsApp message. Data inserted into database as a fallback.")
             except Exception as e:
-                logger.error(f"Failed to save fallback data into database after WhatsApp message failure. Error: {str(e)}")
+                logger.error(f"Failed to save data into database after WhatsApp message failure. Error: {str(e)}")
             finally:
                 database.close()
-        return None
+        return False
 
 def download_audio(media_url, save_path):
     try:
@@ -70,8 +69,8 @@ def download_audio(media_url, save_path):
                 f.write(res.content)
             return True
         else:
-            logger.error(f"Download failed: {res.status_code}")
+            logger.error(f"Download failed from {media_url}. HTTP Status Code: {res.status_code}.")
             return False
     except Exception as e:
-        logger.error(f"Download exception: {str(e)}")
+        logger.error(f"Unexpected error occurred while downloading audio from {media_url}: {str(e)}")
         return False

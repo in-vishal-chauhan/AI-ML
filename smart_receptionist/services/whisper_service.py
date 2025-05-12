@@ -11,5 +11,5 @@ def transcribe_audio(file_path):
         transcript = " ".join([segment.text for segment in segments])
         return transcript, information.language
     except Exception as e:
-        logger.error(f"Transcription failed: {str(e)}")
+        logger.error(f"Audio transcription failed'. Error: {str(e)}")
         raise
