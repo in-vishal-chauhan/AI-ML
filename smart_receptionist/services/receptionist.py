@@ -114,7 +114,7 @@ class AIReceptionist:
                     continue
                 result = getattr(self, tool)(context)
                 results.append(f"\n{label}:\n{result}")
-                context += f"\n\n--- Result from {label} ---\n{result}\n"
+                context += (f"\n\n--- Result from {label} ---\n{result}\n--- End of Result from {label} ---\n")
             return "\n".join(results)
 
         except Exception as e:
