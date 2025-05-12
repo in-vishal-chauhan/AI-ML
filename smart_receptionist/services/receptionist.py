@@ -251,6 +251,7 @@ class AIReceptionist:
     def get_current_date(self, user_input=None):
         return datetime.now().strftime("%A, %d %B %Y")
     
+
     def calculate_profit(self, user_input):
         system_prompt = """
         You are a smart profit calculator assistant.
