@@ -1,0 +1,9 @@
+tabulate
+pinecone
+dotenv
+requests
+pymysql
+python-docx
+flask
+twilio
+faster_whisper
