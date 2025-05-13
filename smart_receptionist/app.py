@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import os
 
 from services.twilio_service import download_audio, send_whatsapp_message
@@ -111,6 +111,10 @@ def show_logs():
     </html>
     """
     return html
+
+@app.route('/chat')
+def chat():
+    return render_template("chat.html")
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
