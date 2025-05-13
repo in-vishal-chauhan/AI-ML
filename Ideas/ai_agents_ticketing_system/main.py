@@ -9,11 +9,14 @@ from tools import (
     extract_fathom_data,
     extract_otter_data,
     extract_team_notetaker_data,
-    create_jira_ticket
+    create_jira_ticket,
+    fetch_existing_jira_tickets,
+    generate_comparison_prompt,
+    update_jira_task_status
 )
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
-from gmail_utils import get_gmail_service
+from gmail_utils import get_gmail_service, get_latest_message
 
 app = FastAPI()
 # Load environment variables
@@ -195,18 +198,42 @@ class KeyPointExtractorAgent:
             return []
 
 # Agent 3: Create ticket in JIRA
+# class TaskComparisonAgent:
+#     def __init__(self):
+#         self.name = "TaskComparisonAgent"
+
+#     def run(self, task_json):
+#         existing_tasks = fetch_existing_jira_tickets()
+#         comparison_prompt = generate_comparison_prompt(existing_tasks, task_json)
+#         # Run LLM on the selected prompt
+#         result = get_llama_response(comparison_prompt)
+
+#         update_jira_task_status(result.get('duplicate'))
+        
+#         return result.get('unique')
+
+# Agent 3: Create ticket in JIRA
 class JiraAgent:
     def __init__(self):
         self.name = "JiraAgent"
 
     def run(self, task_json):
-        return create_jira_ticket(task_json)
+        existing_tasks = fetch_existing_jira_tickets()
+        comparison_prompt = generate_comparison_prompt(existing_tasks, task_json)
+        # Run LLM on the selected prompt
+        result = get_llama_response(comparison_prompt)
+
+        update_jira_task_status(result.get('duplicate'))
+        
+        return create_jira_ticket(result.get('unique'))
+        # return create_jira_ticket(task_json)
 
 # Orchestrator
 class Orchestrator:
     def __init__(self, reader, extractor, jira_agent):
         self.reader = reader
         self.extractor = extractor
+        # self.task_comparison = task_comparison
         self.jira_agent = jira_agent
 
     def run(self, email):
@@ -217,6 +244,10 @@ class Orchestrator:
         keypoints_json = self.extractor.run(body)
         print("[Key Points JSON]:", keypoints_json)
 
+        # print("[Orchestrator] Running TaskComparionAgent...")
+        # task_json = self.task_comparison.run(body)
+        # print("[Key Points JSON]:", task_json)
+
         print("[Orchestrator] Running JiraAgent...")
         result = self.jira_agent.run(keypoints_json)
 
@@ -225,6 +256,7 @@ class Orchestrator:
 if __name__ == '__main__':
     reader = EmailReaderAgent()
     extractor = KeyPointExtractorAgent()
+    # task_comparison = TaskComparisonAgent()
     jira = JiraAgent()
     orchestrator = Orchestrator(reader, extractor, jira)
 
@@ -238,13 +270,21 @@ def read_root():
 # Load AI agents
 reader = EmailReaderAgent()
 extractor = KeyPointExtractorAgent()
+# task_comparison = TaskComparisonAgent()
 jira = JiraAgent()
 orchestrator = Orchestrator(reader, extractor, jira) 
+processed_history_ids = set()
 
 @app.post("/webhook/outlook")
 async def outlook_webhook(request: Request):
     
     data = await request.json()
+
+    # Write history_id to webhook_log.json
+    # with open("webhook_log.json", "a") as log_file:
+    #     json.dump(data, log_file, indent=0)
+    #     log_file.write("\n")
+
     message_data = data.get("message", {}).get("data")
     if not message_data:
         return {"status": "No message data"}
@@ -257,6 +297,12 @@ async def outlook_webhook(request: Request):
     if not history_id:
         return {"status": "No historyId"}
 
+    # Check if historyId has already been processed
+    if history_id in processed_history_ids:
+        return {"status": "Duplicate event"}
+    
+    processed_history_ids.add(history_id)
+        
     # Fetch email from Gmail
     gmail = get_gmail_service()
     history = gmail.users().history().list(
@@ -265,30 +311,41 @@ async def outlook_webhook(request: Request):
         historyTypes=['messageAdded']
     ).execute()
 
-    messages = history.get('history', [])
-    for entry in messages:
-        for msg in entry.get("messages", []):
-            msg_id = msg["id"]
-            message = gmail.users().messages().get(userId="me", id=msg_id, format="full").execute()
+    # messages = history.get('history', [])
 
-            payload = message.get("payload", {})
-            parts = payload.get("parts", [])
+    latest_message = get_latest_message(gmail)
+    # Write history_id to webhook_log.json
+    with open("webhook_log.json", "a") as log_file:
+        json.dump(latest_message.get("body", ""), log_file, indent=0)
+        log_file.write("\n")
 
-            # Try to find plain text part
-            body_data = ""
-            for part in parts:
-                if part.get("mimeType") == "text/plain":
-                    body_data = base64.urlsafe_b64decode(part["body"]["data"]).decode("utf-8")
-                    break
+    print("\n[Webhook] Passing email body to orchestrator...\n")
+    result = orchestrator.run(latest_message.get("body", ""))
+    print("\n[JIRA Ticket Result]:", result)
 
-            if not body_data:
-                body_data = base64.urlsafe_b64decode(payload.get("body", {}).get("data", "")).decode("utf-8")
+    # for entry in messages:
+    #     for msg in entry.get("messages", []):
+    #         msg_id = msg["id"]
+    #         message = gmail.users().messages().get(userId="me", id=msg_id, format="full").execute()
 
-            print("\n[Webhook] Passing email body to orchestrator...\n")
-            result = orchestrator.run(body_data)
-            print("\n[JIRA Ticket Result]:", result)
+    #         payload = message.get("payload", {})
+    #         parts = payload.get("parts", [])
 
-    return {"status": "processed"}
+    #         # Try to find plain text part
+    #         body_data = ""
+    #         for part in parts:
+    #             if part.get("mimeType") == "text/plain":
+    #                 body_data = base64.urlsafe_b64decode(part["body"]["data"]).decode("utf-8")
+    #                 break
+
+    #         if not body_data:
+    #             body_data = base64.urlsafe_b64decode(payload.get("body", {}).get("data", "")).decode("utf-8")
+
+    #         print("\n[Webhook] Passing email body to orchestrator...\n")
+    #         result = orchestrator.run(body_data)
+    #         print("\n[JIRA Ticket Result]:", result)
+
+    return JSONResponse("processed", status_code=200)
 
     # Microsoft sends this for validation on initial webhook registration
     # body = await request.body()

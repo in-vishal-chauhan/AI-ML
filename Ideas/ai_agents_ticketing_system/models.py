@@ -3,7 +3,7 @@ import os
 
 client = OpenAI(
     base_url="https://api.groq.com/openai/v1",
-    api_key=""
+    api_key="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"
 )
 
 def get_llama_response(prompt: str) -> str:

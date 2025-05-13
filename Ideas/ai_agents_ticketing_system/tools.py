@@ -4,6 +4,11 @@ import json
 from datetime import datetime, timedelta
 from models import get_llama_response
 
+jira_url = "https://aimeetingnotes.atlassian.net/"
+auth_user = "vishal.chauhan@tiezinteractive.com"
+auth_token = "ATATT3xFfGF0Vh6S4pbDrMVuH0LmyBlPt6iK23czTD8tf5AEbBfR6v939vUkrdyST7tLHmf57D8oD1zIXJlR_D35xr0PEa9sTjJqaB7LISUmRIeaDKwvArMZyMiwzbuFr9LFavbFNL9VwbpN3QrpLh81VM57p4vIPYAuBnGlC9XiHxAo9GWCzTI=0724B1C6"
+project_key = "AIM"
+
 def extract_email_body(email_text):
     prompt = f"""Read email carefully and extract the meaningful body from the email_text.
         - Ignore unnecessary text like Hi, Hello or any other formal text or greetings.
@@ -32,7 +37,7 @@ def extract_keypoints_as_json(llm_response):
     
 def extract_email_body(email):
     """Extract the email content - in real use you'd parse MIME structure."""
-    return email.strip()
+    return email
 
 
 def extract_fathom_data(content):
@@ -109,11 +114,7 @@ def extract_team_notetaker_data(content):
 
 
 def create_jira_ticket(task_json):
-    jira_url = "https://aimeetingnotes.atlassian.net/"
-    auth_user = "vishal.chauhan@tiezinteractive.com"
-    auth_token = "ATATT3xFfGF0Vh6S4pbDrMVuH0LmyBlPt6iK23czTD8tf5AEbBfR6v939vUkrdyST7tLHmf57D8oD1zIXJlR_D35xr0PEa9sTjJqaB7LISUmRIeaDKwvArMZyMiwzbuFr9LFavbFNL9VwbpN3QrpLh81VM57p4vIPYAuBnGlC9XiHxAo9GWCzTI=0724B1C6"
-    project_key = "AIM"
-
+    
     headers = {
         "Content-Type": "application/json"
     }
@@ -151,4 +152,116 @@ def create_jira_ticket(task_json):
             results.append(response.json())
         else:
             results.append({"error": response.text})
+    return results
+
+
+def fetch_existing_jira_tickets():
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    if not jql:
+        jql = f'project="{project_key}" ORDER BY created DESC'
+
+    query_params = {
+        "jql": jql,
+        "maxResults": 100,
+        "fields": "id,key,summary,description,status"
+    }
+
+    response = requests.get(
+        f"{jira_url}/rest/api/2/search",
+        headers=headers,
+        auth=(auth_user, auth_token),
+        params=query_params
+    )
+
+    if response.status_code != 200:
+        return {"error": response.text}
+
+    data = response.json()
+    issues = []
+    for issue in data.get("issues", []):
+        issues.append({
+            "id": issue["id"],
+            "key": issue["key"],
+            "summary": issue["fields"]["summary"],
+            "description": issue["fields"].get("description", ""),
+            "status": issue["fields"]["status"]["name"]
+        })
+
+    return issues
+
+def generate_comparison_prompt(existing_tasks, new_tasks):
+    return f"""
+            Compare the following two task lists.
+
+            Existing JIRA tasks:
+            {existing_tasks}
+
+            Newly extracted tasks from meeting:
+            {new_tasks}
+
+            Return a JSON object with two keys: "duplicates" and "unique".
+            - "duplicates": items from the new list that are semantically the same as existing ones.
+            - "unique": items that are truly new.
+            - DO NOT add any extra content
+            - DO NOT explain.
+            - DO NOT suggest or add any information
+            Only return valid JSON.
+            """
+
+def update_jira_task_status(duplicates):
+
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    results = []
+
+    if isinstance(duplicates, str):
+        try:
+            duplicates = json.loads(duplicates)
+        except json.JSONDecodeError:
+            return [{"error": "Invalid JSON string"}]
+
+    for task in duplicates:
+        issue_id = task.get("id") or task.get("key")
+        if not issue_id:
+            results.append({"error": "Missing issue ID"})
+            continue
+
+        comment_payload = {
+            "body": f"🔁 Duplicate detected in meeting notes on {datetime.now().strftime('%Y-%m-%d')}. No new task created."
+        }
+
+        # Add a comment to the JIRA ticket
+        comment_response = requests.post(
+            f"{jira_url}/rest/api/2/issue/{issue_id}/comment",
+            auth=(auth_user, auth_token),
+            headers=headers,
+            data=json.dumps(comment_payload)
+        )
+
+        # Optionally: Transition the issue to a specific status (e.g., "Done", "Duplicate", etc.)
+        # You'll need to know the correct transition ID for your workflow
+        # transition_payload = {"transition": {"id": "31"}}  # Replace 31 with real transition ID
+        # transition_response = requests.post(
+        #     f"{jira_url}/rest/api/2/issue/{issue_id}/transitions",
+        #     auth=(auth_user, auth_token),
+        #     headers=headers,
+        #     data=json.dumps(transition_payload)
+        # )
+
+        if comment_response.status_code in [200, 201]:
+            results.append({
+                "id": issue_id,
+                "status": "Comment added"
+            })
+        else:
+            results.append({
+                "id": issue_id,
+                "error": comment_response.text
+            })
+
     return results
