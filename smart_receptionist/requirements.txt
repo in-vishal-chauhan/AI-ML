@@ -7,3 +7,4 @@ python-docx
 flask
 twilio
 faster_whisper
+cryptography
