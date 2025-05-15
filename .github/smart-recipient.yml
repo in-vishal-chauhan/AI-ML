@@ -1,4 +1,4 @@
-name: Python Flask App with MySQL
+name: Smart Recipient
 
 on:
   push:
