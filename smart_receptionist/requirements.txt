@@ -8,3 +8,4 @@ flask
 twilio
 faster_whisper
 cryptography
+huggingface_hub[hf_xet]
