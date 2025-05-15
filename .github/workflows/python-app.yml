@@ -1,10 +1,16 @@
 name: Python Flask App with MySQL
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      db_host:
+        description: 'Database Host'
+        required: true
+        default: '127.0.0.1'
+      db_port:
+        description: 'Database Port'
+        required: true
+        default: '3306'
 
 jobs:
   build:
@@ -43,7 +49,7 @@ jobs:
       - name: Wait for MySQL
         run: |
           echo "Waiting for MySQL..."
-          until mysqladmin ping -h "127.0.0.1" --silent; do
+          until mysqladmin ping -h "${{ github.event.inputs.db_host }}" --silent; do
             sleep 1
           done
           echo "MySQL is up!"
@@ -54,10 +60,10 @@ jobs:
           source ../venv/bin/activate
           export FLASK_APP=app.py
           export FLASK_ENV=development
-          export DB_HOST=127.0.0.1
+          export DB_HOST=${{ github.event.inputs.db_host }}
           export DB_USER=root
           export DB_PASSWORD=root
           export DB_NAME=test_db
-          nohup flask run --host=127.0.0.1 --port=5000 &
+          nohup flask run --host=${{ github.event.inputs.db_host }} --port=5000 &
           sleep 10
-          curl http://127.0.0.1:5000 || echo "Flask app did not respond"
+          curl http://${{ github.event.inputs.db_host }}:5000 || echo "Flask app did not respond"
