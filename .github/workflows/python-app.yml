@@ -12,21 +12,22 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python
+      uses: actions/setup-python@v4
       with:
         python-version: '3.13.2'
+        allow-prereleases: true
 
-    - name: Install dependencies
+    - name: Create virtual environment and install dependencies
       run: |
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install -r smart_receptionist/requirements.txt
 
-    - name: Run Flask app
+    - name: Run Flask app from virtual environment
       run: |
         cd smart_receptionist
         export FLASK_APP=app.py
