@@ -10,28 +10,46 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
+    services:
+      mysql:
+        image: mysql:8.0
+        ports:
+          - 3306:3306
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test_db
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.13.2'
         allow-prereleases: true
 
-    - name: Create virtual environment and install dependencies
+    - name: Create venv and install dependencies
       run: |
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install -r smart_receptionist/requirements.txt
 
-    - name: Run Flask app from virtual environment
+    - name: Run Flask app inside venv
       run: |
         cd smart_receptionist
         export FLASK_APP=app.py
         export FLASK_ENV=development
+        export DB_HOST=127.0.0.1
+        export DB_USER=root
+        export DB_PASSWORD=root
+        export DB_NAME=test_db
         nohup ../venv/bin/flask run --host=127.0.0.1 --port=5000 &
         sleep 5
         curl http://127.0.0.1:5000 || echo "Flask app did not respond"
