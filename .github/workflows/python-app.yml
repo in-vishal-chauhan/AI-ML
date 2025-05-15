@@ -22,34 +22,46 @@ jobs:
           --health-cmd="mysqladmin ping --silent"
           --health-interval=10s
           --health-timeout=5s
-          --health-retries=3
+          --health-retries=5
+          --default-authentication-plugin=mysql_native_password
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v4
       with:
         python-version: '3.13.2'
-        allow-prereleases: true
 
-    - name: Create venv and install dependencies
+    - name: Install dependencies
       run: |
         python -m venv venv
         source venv/bin/activate
         pip install --upgrade pip
         pip install -r smart_receptionist/requirements.txt
+        pip install cryptography
 
-    - name: Run Flask app inside venv
+    - name: Wait for MySQL to be ready
       run: |
+        echo "Waiting for MySQL to be ready..."
+        for i in {1..30}; do
+          nc -z 127.0.0.1 3306 && echo "MySQL is up!" && break
+          echo "MySQL not yet available... retrying ($i)"
+          sleep 2
+        done
+
+    - name: Run Flask app
+      env:
+        DB_HOST: 127.0.0.1
+        DB_USER: root
+        DB_PASSWORD: root
+        DB_NAME: test_db
+        FLASK_APP: app.py
+        FLASK_ENV: development
+      run: |
+        source venv/bin/activate
         cd smart_receptionist
-        export FLASK_APP=app.py
-        export FLASK_ENV=development
-        export DB_HOST=127.0.0.1
-        export DB_USER=root
-        export DB_PASSWORD=root
-        export DB_NAME=test_db
         nohup ../venv/bin/flask run --host=127.0.0.1 --port=5000 &
         sleep 5
         curl http://127.0.0.1:5000 || echo "Flask app did not respond"
