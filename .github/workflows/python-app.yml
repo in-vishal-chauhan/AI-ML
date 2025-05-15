@@ -43,7 +43,7 @@ jobs:
       - name: Wait for MySQL
         run: |
           echo "Waiting for MySQL..."
-          until mysqladmin ping -h "${{ github.event.inputs.db_host }}" -P "${{ github.event.inputs.db_port }}" --silent; do
+          until mysqladmin ping -h "127.0.0.1" -P 3306 --silent; do
             sleep 1
           done
           echo "MySQL is up!"
@@ -54,8 +54,8 @@ jobs:
           source ../venv/bin/activate
           export FLASK_APP=app.py
           export FLASK_ENV=development
-          export DB_HOST=${{ github.event.inputs.db_host }}
-          export DB_PORT=${{ github.event.inputs.db_port }}
+          export DB_HOST=127.0.0.1
+          export DB_PORT=3306
           export DB_USER=root
           export DB_PASSWORD=root
           export DB_NAME=test_db
@@ -63,7 +63,7 @@ jobs:
           echo "Waiting 10 seconds before starting Flask app..."
           sleep 10
 
-          nohup flask run --host=${{ github.event.inputs.flask_host }} --port=${{ github.event.inputs.flask_port }} &
+          nohup flask run --host=127.0.0.1 --port=5000 &
           sleep 10
 
-          curl http://${{ github.event.inputs.flask_host }}:${{ github.event.inputs.flask_port }} || echo "Flask app did not respond"
+          curl http://127.0.0.1:5000 || echo "Flask app did not respond"
