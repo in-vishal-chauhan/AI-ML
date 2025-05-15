@@ -23,8 +23,6 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
-        command: >
-          --default-authentication-plugin=mysql_native_password
 
     steps:
       - name: Checkout repository
@@ -41,6 +39,18 @@ jobs:
           source venv/bin/activate
           pip install --upgrade pip
           pip install -r smart_receptionist/requirements.txt
+          pip install cryptography
+
+      - name: Wait for MySQL to be healthy
+        run: |
+          echo "Waiting for MySQL..."
+          for i in {1..30}; do
+            if mysqladmin ping -h127.0.0.1 -uroot -proot --silent; then
+              echo "MySQL is up!"
+              break
+            fi
+            sleep 2
+          done
 
       - name: Run Flask app
         run: |
