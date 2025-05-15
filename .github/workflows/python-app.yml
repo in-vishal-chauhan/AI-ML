@@ -1,4 +1,4 @@
-name: CI/CD
+name: Python Flask App with MySQL
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  build-and-test:
+  build:
     runs-on: ubuntu-latest
 
     services:
@@ -25,32 +25,28 @@ jobs:
           --health-retries=5
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.13.2'
+          python-version: '3.10'
 
       - name: Install dependencies
         run: |
           python -m venv venv
           source venv/bin/activate
           pip install --upgrade pip
-          pip install -r smart_receptionist/requirements.txt
-          pip install cryptography
+          pip install -r requirements.txt
 
-      - name: Wait for MySQL to be healthy
+      - name: Wait for MySQL
         run: |
           echo "Waiting for MySQL..."
-          for i in {1..30}; do
-            if mysqladmin ping -h127.0.0.1 -uroot -proot --silent; then
-              echo "MySQL is up!"
-              break
-            fi
-            sleep 2
+          until mysqladmin ping -h "127.0.0.1" --silent; do
+            sleep 1
           done
+          echo "MySQL is up!"
 
       - name: Run Flask app
         run: |
@@ -58,6 +54,10 @@ jobs:
           source ../venv/bin/activate
           export FLASK_APP=app.py
           export FLASK_ENV=development
+          export DB_HOST=127.0.0.1
+          export DB_USER=root
+          export DB_PASSWORD=root
+          export DB_NAME=test_db
           nohup flask run --host=127.0.0.1 --port=5000 &
           sleep 10
           curl http://127.0.0.1:5000 || echo "Flask app did not respond"
