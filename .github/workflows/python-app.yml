@@ -1,16 +1,10 @@
 name: Python Flask App with MySQL
 
 on:
-  workflow_dispatch:
-    inputs:
-      db_host:
-        description: 'Database Host'
-        required: true
-        default: '127.0.0.1'
-      db_port:
-        description: 'Database Port'
-        required: true
-        default: '3306'
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
@@ -18,24 +12,17 @@ jobs:
 
     services:
       mysql:
-        build:
-          context: ./mysql-custom
+        image: mysql:8.0
         ports:
           - 3306:3306
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: test_db
-          MYSQL_USER: devuser
-          MYSQL_PASSWORD: devpass
-          MYSQL_SSL_DISABLED: "true"
         options: >-
-          --pid-file=/var/lib/mysql/mysqld.pid
           --health-cmd="mysqladmin ping --silent"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
-        volumes:
-          - ./mysql-init/init.sql:/docker-entrypoint-initdb.d/init.sql
 
     steps:
       - name: Checkout code
@@ -56,21 +43,27 @@ jobs:
       - name: Wait for MySQL
         run: |
           echo "Waiting for MySQL..."
-          until mysqladmin ping -h "${{ github.event.inputs.db_host }}" --silent; do
+          until mysqladmin ping -h "${{ github.event.inputs.db_host }}" -P "${{ github.event.inputs.db_port }}" --silent; do
             sleep 1
           done
           echo "MySQL is up!"
 
-      - name: Run Flask app
+      - name: Run Flask app (with 10s startup wait)
         run: |
           cd smart_receptionist
           source ../venv/bin/activate
           export FLASK_APP=app.py
           export FLASK_ENV=development
           export DB_HOST=${{ github.event.inputs.db_host }}
-          export DB_USER=devuser
-          export DB_PASSWORD=devpass
+          export DB_PORT=${{ github.event.inputs.db_port }}
+          export DB_USER=root
+          export DB_PASSWORD=root
           export DB_NAME=test_db
-          nohup flask run --host=0.0.0.0 --port=5000 &
+
+          echo "Waiting 10 seconds before starting Flask app..."
           sleep 10
-          curl http://${{ github.event.inputs.db_host }}:5000 || echo "Flask app did not respond"
+
+          nohup flask run --host=${{ github.event.inputs.flask_host }} --port=${{ github.event.inputs.flask_port }} &
+          sleep 10
+
+          curl http://${{ github.event.inputs.flask_host }}:${{ github.event.inputs.flask_port }} || echo "Flask app did not respond"
