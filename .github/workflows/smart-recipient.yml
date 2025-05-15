@@ -1,0 +1,63 @@
+name: Smart Recipient
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        ports:
+          - 3306:3306
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test_db
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13.2'
+
+      - name: Install dependencies
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r smart_receptionist/requirements.txt
+      - name: Wait for MySQL
+        run: |
+          echo "Waiting for MySQL..."
+          until mysqladmin ping -h "127.0.0.1" -P 3306 --silent; do
+            sleep 1
+          done
+          echo "MySQL is up!"
+      - name: Run Flask app (with 10s startup wait)
+        run: |
+          cd smart_receptionist
+          source ../venv/bin/activate
+          export FLASK_APP=app.py
+          export FLASK_ENV=development
+          export DB_HOST=127.0.0.1
+          export DB_PORT=3306
+          export DB_USER=root
+          export DB_PASSWORD=root
+          export DB_NAME=test_db
+          echo "Waiting 10 seconds before starting Flask app..."
+          sleep 10
+          nohup flask run --host=127.0.0.1 --port=5000 &
+          sleep 10
+          curl http://127.0.0.1:5000 || echo "Flask app did not respond"
