@@ -1,0 +1,28 @@
+flowchart TD
+
+    A[Incoming Email Data -Dummy or Webhook-] --> B[Orchestrator]
+
+
+    B --> C[Classifier Agent<br/>-Rule-based Model-]
+    C -->|Classifies as Notetaker| D1[NoteTakerAgent]
+    C -->|Classifies as Formal| D2[FormalEmailAgent]
+    C -->|Classifies as General| D3[GeneralAgent]
+
+
+    D1 --> E1[NotesExtractorTool<br/>-Extract Action Items-]
+    E1 --> F1[DBTool<br/>-Store Notes-]
+    F1 --> G1[Result: Notes Extracted]
+
+
+    D2 --> E2[JiraTool<br/>-Create Ticket-]
+    E2 --> F2[DBTool<br/>-Store Ticket Info-]
+    F2 --> G2[Result: Ticket Created]
+
+
+    D3 --> F3[DBTool<br/>-Store Info-]
+    F3 --> G3[Result: Info Stored]
+
+
+    G1 --> H[Orchestrator Returns Result]
+    G2 --> H
+    G3 --> H

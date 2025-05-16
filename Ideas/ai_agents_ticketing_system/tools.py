@@ -10,7 +10,8 @@ auth_token = "ATATT3xFfGF0Vh6S4pbDrMVuH0LmyBlPt6iK23czTD8tf5AEbBfR6v939vUkrdyST7
 project_key = "AIM"
 
 def extract_email_body(email_text):
-    prompt = f"""Read email carefully and extract the meaningful body from the email_text.
+    prompt = f"""You are an expert meeting assistant. Read email carefully and extract the meaningful body from the email_text.
+        - Extract data only if email source is notetaker or meeting assistant like Fathom, Otter, Team etc..
         - Ignore unnecessary text like Hi, Hello or any other formal text or greetings.
         - Capture only email body has meaning like tasks, instructions, to do list, key points, bullet points, asks, queries, questions, enquiries, key features,
         assignments, updates, notes, work, to do, list etc, which has meaning complete or execute or perform as a task.
@@ -39,7 +40,6 @@ def extract_email_body(email):
     """Extract the email content - in real use you'd parse MIME structure."""
     return email
 
-
 def extract_fathom_data(content):
     print("[Tool: extract_fathom_data] Creating Fathom prompt for LLM...")
     prompt = f"""
@@ -62,7 +62,6 @@ def extract_fathom_data(content):
         {content}
         """
     return prompt
-
 
 def extract_otter_data(content):
     print("[Tool: extract_otter_data] Creating Otter prompt for LLM...")
@@ -87,7 +86,6 @@ def extract_otter_data(content):
         """
     return prompt
 
-
 def extract_team_notetaker_data(content):
     print("[Tool: extract_team_notetaker_data] Creating Team Notetaker prompt for LLM...")
     prompt = f"""
@@ -111,8 +109,6 @@ def extract_team_notetaker_data(content):
         """
     return prompt
 
-
-
 def create_jira_ticket(task_json):
     
     headers = {
@@ -133,7 +129,7 @@ def create_jira_ticket(task_json):
         issue_data = {
             "fields": {
             "project": {"key": project_key},
-            "summary": task.get('task', "No summary"),
+            "summary": task.get('summary', "No summary"),
             "description": f"Due: {due_date}\nTeam: {assigned_team}\nAssignee: {assigned_team}",
             "duedate":due_date,
             "issuetype": {"name": "Task"},
@@ -154,8 +150,8 @@ def create_jira_ticket(task_json):
             results.append({"error": response.text})
     return results
 
-
 def fetch_existing_jira_tickets():
+    jql=None
     headers = {
         "Content-Type": "application/json"
     }
@@ -170,7 +166,7 @@ def fetch_existing_jira_tickets():
     }
 
     response = requests.get(
-        f"{jira_url}/rest/api/2/search",
+        f"{jira_url}/rest/api/3/search",
         headers=headers,
         auth=(auth_user, auth_token),
         params=query_params
@@ -180,6 +176,7 @@ def fetch_existing_jira_tickets():
         return {"error": response.text}
 
     data = response.json()
+    
     issues = []
     for issue in data.get("issues", []):
         issues.append({
@@ -203,15 +200,78 @@ def generate_comparison_prompt(existing_tasks, new_tasks):
             {new_tasks}
 
             Return a JSON object with two keys: "duplicates" and "unique".
-            - "duplicates": items from the new list that are semantically the same as existing ones.
+            - "duplicates": items from the new list that are semantically the same either in meaning, or in tone or in context as existing ones.
             - "unique": items that are truly new.
             - DO NOT add any extra content
             - DO NOT explain.
             - DO NOT suggest or add any information
             Only return valid JSON.
+
+            In case of duplicates follow the below rules:
             """
 
 def update_jira_task_status(duplicates):
+
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    results = []
+
+    if isinstance(duplicates, str):
+        try:
+            duplicates = json.loads(duplicates)
+        except json.JSONDecodeError:
+            return [{"error": "Invalid JSON string"}]
+
+    for task in duplicates:
+        issue_key = task.get("key")
+        if not issue_key:
+            results.append({"error": "Missing issue ID"})
+            continue
+
+        # Step 1: Get available transitions
+        transitions_url = f"{jira_url}/rest/api/3/issue/{issue_key}/transitions"
+        resp = requests.get(transitions_url, auth=(auth_user, auth_token), headers=headers)
+        if resp.status_code != 200:
+            return {"success": False, "error": f"Failed to get transitions: {resp.text}"}
+
+        transitions = resp.json().get("transitions", [])
+        transition_id = None
+
+        # Step 2: Find the transition ID for 'Close'
+        for t in transitions:
+            # You may need to adjust this if your workflow uses 'Closed' or another name
+            if t["name"].lower() in [task.get("status")]:
+                transition_id = t["id"]
+                break
+
+        if not transition_id:
+            return {"success": False, "error": "No 'Close' transition found for this issue."}
+
+        # Step 3: Perform the transition
+        payload = {
+            "transition": {
+                "id": transition_id
+            }
+        }
+        resp = requests.post(transitions_url, auth=(auth_user, auth_token), headers=headers, json=payload)
+        if resp.status_code not in [200, 204]:
+            return {"success": False, "error": f"Failed to close issue: {resp.text}"}
+
+        # Step 4: (Optional) Confirm the status
+        issue_url = f"{jira_url}/rest/api/3/issue/{issue_key}"
+        resp = requests.get(issue_url, auth=(auth_user, auth_token), headers=headers)
+        if resp.status_code == 200:
+            status = resp.json()["fields"]["status"]["name"]
+            results.append({"success": True, "new_status": status})
+        else:
+            results.append({"success": True, "message": "Issue updated, but failed to confirm new status."})
+    
+    return results
+
+
+def update_jira_task_comment(duplicates):
 
     headers = {
         "Content-Type": "application/json"
@@ -237,7 +297,7 @@ def update_jira_task_status(duplicates):
 
         # Add a comment to the JIRA ticket
         comment_response = requests.post(
-            f"{jira_url}/rest/api/2/issue/{issue_id}/comment",
+            f"{jira_url}/rest/api/3/issue/{issue_id}/comment",
             auth=(auth_user, auth_token),
             headers=headers,
             data=json.dumps(comment_payload)
@@ -256,7 +316,7 @@ def update_jira_task_status(duplicates):
         if comment_response.status_code in [200, 201]:
             results.append({
                 "id": issue_id,
-                "status": "Comment added"
+                "status": task.get("status", "No status"),
             })
         else:
             results.append({
@@ -264,4 +324,10 @@ def update_jira_task_status(duplicates):
                 "error": comment_response.text
             })
 
+        # Write history_id to webhook_log.json
+        # with open("webhook_log.json", "a") as log_file:
+        #     json.dump(results, log_file, indent=0)
+        #     log_file.write("\n")
+
     return results
+

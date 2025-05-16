@@ -1,7 +1,6 @@
 import os
 import json
 import base64
-import uvicorn
 from dotenv import load_dotenv
 from models import get_llama_response
 from tools import (
@@ -16,7 +15,9 @@ from tools import (
 )
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
-from gmail_utils import get_gmail_service, get_latest_message
+from gmail_utils import get_gmail_service, get_latest_message, get_last_10_emails, load_emails, save_emails
+import asyncio
+
 
 app = FastAPI()
 # Load environment variables
@@ -25,104 +26,6 @@ load_dotenv()
 app = FastAPI()
 # Simulated dummy email
 DUMMY_EMAIL = '''
-From: projectmanager@example.com
-Subject: Meeting Follow-up
-
-FATHOM
-Meeting with Bijal Sanghavi
-Showcase by our AI/ML team :)
-May 01, 2025  •  52 mins  •  View Meeting or Ask Fathom
-Action Items 
-    Add phone call functionality to AI receptionist project
-    Vishal Chauhan
-            
-    Implement voice-based functionality for AI receptionist
-    Paras Majethiya
-            
-    Add tool to allow LLM to perform more reasoning in AI receptionist
-    Paras Majethiya
-            
-    Research/implement basic receptionist features (e.g. 9-5 hrs, holidays) for AI agent
-    Paras Majethiya
-            
-    Make current AI receptionist implementation more robust
-    Vishal Chauhan
-            
-    Update project ideas document w/ brainstormed use cases, mark difficulty levels
-    Vishal Chauhan
-
-Meeting Summary
-
-Meeting Purpose
-    Showcase and discuss the AI/ML team's development of an AI receptionist agent for handling customer inquiries.
-
-Key Takeaways
-    The team has developed an AI receptionist prototype for handling price inquiries in the textile industry, with potential for expansion to other industries
-
-    Current implementation handles text and voice inputs via WhatsApp, with plans to add phone call functionality
-
-    The system uses AI to translate queries, extract relevant parameters, and query a database to provide accurate responses
-
-    Future enhancements include adding more robust functionality, improving error handling, and expanding use cases beyond simple price inquiries
-
-Topics
-Project Overview and Vision
-    Developed an AI-based receptionist agent for handling customer inquiries, initially focused on textile industry price queries
-
-    Vision is to create a versatile AI receptionist that can handle various tasks like answering basic questions, providing company information, and potentially scheduling appointments
-
-    Aimed at being a competitive product in the US market for AI receptionist solutions
-
-Technical Implementation
-    Uses WhatsApp API for communication channel
-
-    Implements a Python script to process incoming messages
-
-    Utilizes AI for language translation and parameter extraction
-
-    Queries a MySQL database to retrieve product information
-
-    Sends responses back through the appropriate channel (e.g., WhatsApp)
-
-Current Capabilities
-    Handles text and voice inputs via WhatsApp
-
-    Processes queries in multiple languages
-
-    Extracts relevant parameters (e.g., color, quality, material) from natural language inputs
-
-    Queries a database to retrieve accurate price information
-
-    Responds in the original query language
-
-Future Enhancements
-    Add phone call functionality for voice interactions
-
-    Implement more robust error handling and system redundancy
-
-    Expand use cases beyond price inquiries (e.g., general customer support, appointment scheduling)
-
-    Integrate with calendar APIs for scheduling functionality
-
-    Improve AI's ability to handle more complex queries and provide suggestions
-
-Training and Development Process
-    Team explored multiple AI tools and LLM (Large Language Model) implementations
-
-    Used M8N (similar to Zapier) for no-code automation integration
-
-    Focus on understanding AI concepts and integrating with everyday systems like WhatsApp and email
-
-Next Steps
-    Make the current implementation more robust
-
-    Add voice-based functionality
-
-    Integrate another tool to allow LLM to perform more complex reasoning
-
-    Complete the main AI training implementation by May 19th
-
-    Explore additional use cases and enhancements after the core training is complete
 
 '''
 
@@ -139,53 +42,60 @@ class KeyPointExtractorAgent:
     def __init__(self):
         self.name = "KeyPointExtractorAgent"
 
-    def run(self, content):
-        source_prompt = f"""
-            You are a smart assistant. Given the following meeting email, identify the service that generated it.
-            It can be one of:
-            - Fathom
-            - Otter
-            - Team Notetaker
+    def run(self, content, existing_tasks):
 
-            Only return one of the following exactly: "Fathom", "Otter", or "Team Notetaker".
+        print("[KeyPointExtractorAgent] generic extractor")
+        prompt = f"""
+                You are a smart assistant. Given the following meeting email, identify the service that generated it.
+                It can be one of:
+                - Fathom
+                - Fellow
+                - Otter
+                - Team Notetaker
+                - Fireflies
+                - tldv
+                - bluedothq
+                - sana.ai
+                - Mem
+                - noteGPT
+                - notta
+                - or similar tools.
+                
+                Ignore all emails that are not from these meeting notetaker sources.
+                1. For ignoring emails:
+                - Return ONLY JSON list [].
+                - Do not explain.
+                - Do not add any extra content.
+                - Do not suggest or add any information
 
-            Email:
-            {content}
-            """
-        source = get_llama_response(source_prompt).strip().lower()
-        
-        # Check if 'content' is in JSON format
-        try:
-            content_json = json.loads(content)
-            content = content_json.get('Body', content)  # Extract 'body' if available
-        except json.JSONDecodeError:
-            print("[KeyPointExtractorAgent] Content is not in JSON format, using as-is.")
+                2. For qualifying emails:
+                    You are an AI Task Manager.
+                    Given a list of project tasks in JSON format and new meeting notes or action items.
+                    
+                project tasks:
+                {existing_tasks}
 
-        if isinstance(content, dict):  # If content is a dictionary (JSON), convert to string
-            content = json.dumps(content)
-
-        # Decide tool based on LLM-identified source
-        if "fathom" in source:
-            print("[KeyPointExtractorAgent] Identified: Fathom")
-            prompt = extract_fathom_data(content)
-        elif "otter" in source:
-            print("[KeyPointExtractorAgent] Identified: Otter")
-            prompt = extract_otter_data(content)
-        elif "team" in source:
-            print("[KeyPointExtractorAgent] Identified: Team Notetaker")
-            prompt = extract_team_notetaker_data(content)
-        else:
-            print("[KeyPointExtractorAgent] Source unidentified, using generic extractor")
-            prompt = f"""
-                Extract action items from the following content and return a JSON list in this format:
-
-                [
-                {{"task": "", "due_date": "", "assigned_team": ""}},
-                ...
-                ]
-
-                Content:
+                new meeting notes:
                 {content}
+                
+                Perform the following:
+                Read the new meeting notes carefully. Extract the actionable task items.
+                Identify which tasks from the new meeting notes semantically match the existing tasks.
+                Update the status of each 'project tasks' as per the latest information in the 'new meeting notes'.
+
+                Add any new tasks mentioned, with the correct status and assigned team, 
+                [{{"id": "", "key": "", "summary": YOUR_EXTRACTED_TASK, "description": "", "status": "New"}}, ...] in json list.
+
+                Return a JSON format with two keys: "Update" and "New". Newly created tasks should be in the "New" key, and updated tasks should be in the "Update" key.
+
+                - Final result must be in JSON format only, nothing else.
+                - DO NOT add new line formatting.
+                - DO NOT repeat the task in JSON object.
+                - DO NOT explain.
+                - DO NOT add any extra content.
+                - DO NOT add suggestion or any information
+                - DO NOT beautify the JSON object.
+                - Return ONLY JSON format
                 """
             
         # Run LLM on the selected prompt
@@ -198,79 +108,126 @@ class KeyPointExtractorAgent:
             return []
 
 # Agent 3: Create ticket in JIRA
-# class TaskComparisonAgent:
-#     def __init__(self):
-#         self.name = "TaskComparisonAgent"
-
-#     def run(self, task_json):
-#         existing_tasks = fetch_existing_jira_tickets()
-#         comparison_prompt = generate_comparison_prompt(existing_tasks, task_json)
-#         # Run LLM on the selected prompt
-#         result = get_llama_response(comparison_prompt)
-
-#         update_jira_task_status(result.get('duplicate'))
-        
-#         return result.get('unique')
-
-# Agent 3: Create ticket in JIRA
 class JiraAgent:
     def __init__(self):
         self.name = "JiraAgent"
 
     def run(self, task_json):
-        existing_tasks = fetch_existing_jira_tickets()
-        comparison_prompt = generate_comparison_prompt(existing_tasks, task_json)
-        # Run LLM on the selected prompt
-        result = get_llama_response(comparison_prompt)
+        # existing_tasks = fetch_existing_jira_tickets()
+        # comparison_prompt = generate_comparison_prompt(existing_tasks, task_json)
+        # # Run LLM on the selected prompt
+        # result = get_llama_response(comparison_prompt)
 
-        update_jira_task_status(result.get('duplicate'))
+        # Write history_id to webhook_log.json
+        # Check if task_json is JSON formatted or string formatted
+        # if isinstance(task_json, str):
+        #     task_json = task_json.strip("\\")
+        #     try:
+        #         task_json = json.loads(task_json)
+        #     except json.JSONDecodeError as e:
+        #         print("[JiraAgent] Failed to parse JSON after stripping slashes:", e)
+        #         return {}
+            
+        with open("webhook_log.json", "a") as log_file:
+            json.dump(task_json, log_file, indent=0)
+            
+            
+        result = []
+        # Check if 'result' is in JSON format or string
+        if isinstance(task_json, str):
+            try:
+                task_json = json.loads(task_json)
+            except json.JSONDecodeError:
+                print("[JiraAgent] Result is not in JSON format, using as-is.")
+                return {}
+        # Check if 'duplicate' key exists and is empty
+        if task_json and task_json.get('Update'):
+            # Check if 'Update' key exists and is empty
+            if isinstance(task_json, dict) and 'Update' in task_json and not task_json['Update']:
+                print("[JiraAgent] 'Update' key is empty.")
+            else:
+                result = update_jira_task_status(task_json.get('Update'))
         
-        return create_jira_ticket(result.get('unique'))
+        if task_json and task_json.get('New'):
+            # Check if 'Update' key exists and is empty
+            if isinstance(task_json, dict) and 'New' in task_json and not task_json['New']:
+                print("[JiraAgent] 'New' key is empty.")
+            else:
+                result = create_jira_ticket(task_json.get('New'))
+        # else:
+        return result
+        # if isinstance(result, dict) and 'duplicates' in result and not result['duplicates']:
+        #     print("[JiraAgent] 'duplicates' key is empty.")
+        # else :
+        #     update_jira_task_status(result.get('duplicates'))
+        
+        # return create_jira_ticket(result.get('unique'))
         # return create_jira_ticket(task_json)
 
 # Orchestrator
+# Update the Orchestrator class to support async
 class Orchestrator:
     def __init__(self, reader, extractor, jira_agent):
         self.reader = reader
         self.extractor = extractor
-        # self.task_comparison = task_comparison
         self.jira_agent = jira_agent
+        # Fetch existing tasks once at the start
+        self.existing_tasks = fetch_existing_jira_tickets()
 
-    def run(self, email):
+    async def run(self, email):
         print("[Orchestrator] Running EmailReaderAgent...")
-        body = self.reader.run(email)
-
+        body = await asyncio.to_thread(self.reader.run, email)  # Run blocking code in a thread
         print("[Orchestrator] Running KeyPointExtractorAgent...")
-        keypoints_json = self.extractor.run(body)
+        keypoints_json = await asyncio.to_thread(self.extractor.run, body, self.existing_tasks)
         print("[Key Points JSON]:", keypoints_json)
 
-        # print("[Orchestrator] Running TaskComparionAgent...")
-        # task_json = self.task_comparison.run(body)
-        # print("[Key Points JSON]:", task_json)
-
         print("[Orchestrator] Running JiraAgent...")
-        result = self.jira_agent.run(keypoints_json)
+        result = await asyncio.to_thread(self.jira_agent.run, keypoints_json)
 
-        return result 
+        return result
 
-if __name__ == '__main__':
+# Update the main block to use async
+async def main():
     reader = EmailReaderAgent()
     extractor = KeyPointExtractorAgent()
-    # task_comparison = TaskComparisonAgent()
     jira = JiraAgent()
     orchestrator = Orchestrator(reader, extractor, jira)
 
-    result = orchestrator.run(DUMMY_EMAIL)
-    print("\n[JIRA Response]:", result)
+    emails = load_emails()
+    if not emails:
+        emails = await asyncio.to_thread(get_last_10_emails)
+        #Save emails to file
+        save_emails(emails)
+        
+    # while emails:
+    batch = emails[-2:]  # Get last 2 emails
+    for email in batch:
+        print(f"Processing: {email}")
+        await orchestrator.run(email['body'])  # Await the async run method
+
+    emails = emails[:-2]  # Remove last 2
+    save_emails(emails)
+    print(f"Remaining emails: {emails}")
+    
+    if not emails:
+        if os.path.exists("emails.json"):
+            os.remove("emails.json")
+            print("emails.json removed.")
+        # time.sleep(60)  # Wait 1 minute
+
+
+# Run the async main function
+if __name__ == '__main__':
+    asyncio.run(main())
+
     
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return {"Hello": "AI Meeting Notes"}
 
 # Load AI agents
 reader = EmailReaderAgent()
 extractor = KeyPointExtractorAgent()
-# task_comparison = TaskComparisonAgent()
 jira = JiraAgent()
 orchestrator = Orchestrator(reader, extractor, jira) 
 processed_history_ids = set()
@@ -312,40 +269,15 @@ async def outlook_webhook(request: Request):
     ).execute()
 
     # messages = history.get('history', [])
-
     latest_message = get_latest_message(gmail)
-    # Write history_id to webhook_log.json
-    with open("webhook_log.json", "a") as log_file:
-        json.dump(latest_message.get("body", ""), log_file, indent=0)
-        log_file.write("\n")
 
     print("\n[Webhook] Passing email body to orchestrator...\n")
-    result = orchestrator.run(latest_message.get("body", ""))
+    # result = orchestrator.run(latest_message.get("body", ""))
+    result = await orchestrator.run(latest_message.get("body", ""))
     print("\n[JIRA Ticket Result]:", result)
 
-    # for entry in messages:
-    #     for msg in entry.get("messages", []):
-    #         msg_id = msg["id"]
-    #         message = gmail.users().messages().get(userId="me", id=msg_id, format="full").execute()
-
-    #         payload = message.get("payload", {})
-    #         parts = payload.get("parts", [])
-
-    #         # Try to find plain text part
-    #         body_data = ""
-    #         for part in parts:
-    #             if part.get("mimeType") == "text/plain":
-    #                 body_data = base64.urlsafe_b64decode(part["body"]["data"]).decode("utf-8")
-    #                 break
-
-    #         if not body_data:
-    #             body_data = base64.urlsafe_b64decode(payload.get("body", {}).get("data", "")).decode("utf-8")
-
-    #         print("\n[Webhook] Passing email body to orchestrator...\n")
-    #         result = orchestrator.run(body_data)
-    #         print("\n[JIRA Ticket Result]:", result)
-
-    return JSONResponse("processed", status_code=200)
+    await asyncio.sleep(30)
+    return JSONResponse("Success", status_code=200)
 
     # Microsoft sends this for validation on initial webhook registration
     # body = await request.body()
