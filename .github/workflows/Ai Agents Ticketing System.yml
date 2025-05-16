@@ -30,6 +30,9 @@ jobs:
         run: |
           source venv/bin/activate
           cd Ideas/ai_agents_ticketing_system
-          nohup python main.py --host=127.0.0.1 --port=8000 &
-          sleep 10
+          nohup python main.py --host=127.0.0.1 --port=8000 > nohup.out 2>&1 &
+          sleep 15
+          echo "=== Application Logs ==="
+          cat nohup.out
+          echo "========================"
           curl --fail http://127.0.0.1:8000 || (echo "App did not respond" && exit 1)
