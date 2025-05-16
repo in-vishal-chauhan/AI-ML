@@ -21,18 +21,18 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m venv venv
-          source venv/bin/activate
+          python -m venv venv_lib
+          source venv_lib/bin/activate
           pip install --upgrade pip
           pip install -r Ideas/ai_agents_ticketing_system/requirements.txt
 
       - name: Run Application and Health Check
         run: |
-          source venv/bin/activate
+          source venv_lib/bin/activate
           cd Ideas/ai_agents_ticketing_system
-          nohup python main.py --host=127.0.0.1 --port=8000 > nohup.out 2>&1 &
+          nohup uvicorn main:app --host=127.0.0.1 --port=8000 --reload > uvicorn.log 2>&1 &
           sleep 15
-          echo "=== Application Logs ==="
-          cat nohup.out
-          echo "========================"
+          echo "=== Uvicorn Logs ==="
+          cat uvicorn.log
+          echo "===================="
           curl --fail http://127.0.0.1:8000 || (echo "App did not respond" && exit 1)
