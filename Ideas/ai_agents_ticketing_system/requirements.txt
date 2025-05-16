@@ -4,3 +4,7 @@ requests
 fastapi
 uvicorn
 schedule
+ngrok
+google-auth 
+google-auth-oauthlib 
+google-api-python-client

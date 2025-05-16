@@ -63,7 +63,7 @@ class KeyPointExtractorAgent:
                 
                 Ignore all emails that are not from these meeting notetaker sources.
                 1. For ignoring emails:
-                - Return ONLY JSON list [].
+                - Return ONLY JSON format [].
                 - Do not explain.
                 - Do not add any extra content.
                 - Do not suggest or add any information
