@@ -1,6 +1,7 @@
 import os
 import json
 import base64
+import uvicorn
 from dotenv import load_dotenv
 from models import get_llama_response
 from tools import (
@@ -17,7 +18,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from gmail_utils import get_gmail_service, get_latest_message, get_last_10_emails, load_emails, save_emails
 import asyncio
-
+import time
 
 app = FastAPI()
 # Load environment variables
@@ -46,7 +47,7 @@ class KeyPointExtractorAgent:
 
         print("[KeyPointExtractorAgent] generic extractor")
         prompt = f"""
-                You are a smart assistant. Given the following meeting email, identify the service that generated it.
+                You are a smart assistant. Given the following NEW_MEETING_NOTES, identify the service that generated it.
                 It can be one of:
                 - Fathom
                 - Fellow
@@ -63,39 +64,39 @@ class KeyPointExtractorAgent:
                 
                 Ignore all emails that are not from these meeting notetaker sources.
                 1. For ignoring emails:
-                - Return ONLY JSON format [].
-                - Do not explain.
-                - Do not add any extra content.
-                - Do not suggest or add any information
+                    - Return ONLY JSON format [].
+                    - Do not explain.
+                    - Do not add any extra content.
+                    - Do not suggest or add any information
 
                 2. For qualifying emails:
                     You are an AI Task Manager.
-                    Given a list of project tasks in JSON format and new meeting notes or action items.
+                    Given a list of PROJECT_TASK in JSON format and NEW_MEETING_NOTES or action items.
                     
-                project tasks:
-                {existing_tasks}
+                    PROJECT_TASK:
+                    {existing_tasks}
 
-                new meeting notes:
-                {content}
-                
-                Perform the following:
-                Read the new meeting notes carefully. Extract the actionable task items.
-                Identify which tasks from the new meeting notes semantically match the existing tasks.
-                Update the status of each 'project tasks' as per the latest information in the 'new meeting notes'.
+                    NEW_MEETING_NOTES:
+                    {content}
+                    
+                    Perform the following:
+                    Read the NEW_MEETING_NOTES carefully.
+                    Identify which tasks from the NEW_MEETING_NOTES semantically match the existing tasks.
+                    Update the status of each PROJECT_TASK as per the latest information in the NEW_MEETING_NOTES.
 
-                Add any new tasks mentioned, with the correct status and assigned team, 
-                [{{"id": "", "key": "", "summary": YOUR_EXTRACTED_TASK, "description": "", "status": "New"}}, ...] in json list.
+                    Add any new tasks mentioned, with the correct status and assigned team, 
+                    [{{"id": "", "key": "", "summary": YOUR_EXTRACTED_TASK, "description": "", "status": "New"}}, ...] in json list.
 
-                Return a JSON format with two keys: "Update" and "New". Newly created tasks should be in the "New" key, and updated tasks should be in the "Update" key.
+                    Return a JSON format with two keys: "Update" and "New". Newly created tasks should be in the "New" key, and updated tasks should be in the "Update" key.
 
-                - Final result must be in JSON format only, nothing else.
-                - DO NOT add new line formatting.
-                - DO NOT repeat the task in JSON object.
-                - DO NOT explain.
-                - DO NOT add any extra content.
-                - DO NOT add suggestion or any information
-                - DO NOT beautify the JSON object.
-                - Return ONLY JSON format
+                    - Final result must be in JSON format only, nothing else.
+                    - DO NOT add new line formatting.
+                    - DO NOT repeat the task in JSON object.
+                    - DO NOT explain.
+                    - DO NOT add any extra content.
+                    - DO NOT add suggestion or any information
+                    - DO NOT beautify the JSON object.
+                    - Return ONLY JSON format
                 """
             
         # Run LLM on the selected prompt

@@ -9,26 +9,26 @@ auth_user = "vishal.chauhan@tiezinteractive.com"
 auth_token = "ATATT3xFfGF0Vh6S4pbDrMVuH0LmyBlPt6iK23czTD8tf5AEbBfR6v939vUkrdyST7tLHmf57D8oD1zIXJlR_D35xr0PEa9sTjJqaB7LISUmRIeaDKwvArMZyMiwzbuFr9LFavbFNL9VwbpN3QrpLh81VM57p4vIPYAuBnGlC9XiHxAo9GWCzTI=0724B1C6"
 project_key = "AIM"
 
-def extract_email_body(email_text):
-    prompt = f"""You are an expert meeting assistant. Read email carefully and extract the meaningful body from the email_text.
-        - Extract data only if email source is notetaker or meeting assistant like Fathom, Otter, Team etc..
-        - Ignore unnecessary text like Hi, Hello or any other formal text or greetings.
-        - Capture only email body has meaning like tasks, instructions, to do list, key points, bullet points, asks, queries, questions, enquiries, key features,
-        assignments, updates, notes, work, to do, list etc, which has meaning complete or execute or perform as a task.
-        - DO NOT add any extra content
-        - DO NOT explain.
-        Content:
-        {email_text}
+# def extract_email_body(email_text):
+#     prompt = f"""You are an expert meeting assistant. Read email carefully and extract the meaningful body from the email_text.
+#         - Extract data only if email source is notetaker or meeting assistant like Fathom, Otter, Team etc..
+#         - Ignore unnecessary text like Hi, Hello or any other formal text or greetings.
+#         - Capture only email body has meaning like tasks, instructions, to do list, key points, bullet points, asks, queries, questions, enquiries, key features,
+#         assignments, updates, notes, work, to do, list etc, which has meaning complete or execute or perform as a task.
+#         - DO NOT add any extra content
+#         - DO NOT explain.
+#         Content:
+#         {email_text}
 
-        Format:
-        [
-        {{"task": "", "due_date": "", "assigned_team": ""}},
-        ...
-        ]"""
+#         Format:
+#         [
+#         {{"task": "", "due_date": "", "assigned_team": ""}},
+#         ...
+#         ]"""
     
-    return get_llama_response(prompt)
-    # body = email_text.split("\n\n", 1)[-1].strip()
-    # return body
+#     return get_llama_response(prompt)
+#     # body = email_text.split("\n\n", 1)[-1].strip()
+#     # return body
 
 def extract_keypoints_as_json(llm_response):
     try:
@@ -239,10 +239,13 @@ def update_jira_task_status(duplicates):
         transitions = resp.json().get("transitions", [])
         transition_id = None
 
+
+
         # Step 2: Find the transition ID for 'Close'
         for t in transitions:
             # You may need to adjust this if your workflow uses 'Closed' or another name
-            if t["name"].lower() in [task.get("status")]:
+            # if t["name"].lower() in [task.get("status")]:
+            if t["name"].lower() in ["close", "done", "resolved", "completed","in progress"]:  
                 transition_id = t["id"]
                 break
 
