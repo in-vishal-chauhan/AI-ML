@@ -4,7 +4,8 @@ import os
 from services.twilio_service import download_audio, send_whatsapp_message
 from services.whisper_service import transcribe_audio
 from services.groq_service import GroqAPI
-from services.database_service import Database
+# from services.database_service import Database
+from services.sqlite_db import SqliteDatabase
 from services.receptionist import AIReceptionist
 # from services.document_qa_service import DocumentQAService
 from services.read_store_vector import ReadStoreVector
@@ -15,7 +16,7 @@ logger = get_logger(__name__)
 
 # Initialize services
 groq = GroqAPI()
-db = Database()
+db = SqliteDatabase()
 # document_qa_service = DocumentQAService()
 read_store_vector = ReadStoreVector()
 receptionist = AIReceptionist(groq, db, read_store_vector)

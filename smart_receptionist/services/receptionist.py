@@ -139,8 +139,15 @@ class AIReceptionist:
             if not results:
                 return "Sorry, I couldn't find any matching records. Please try refining your search."
 
+            # Table for mysql
+            # table_data = [
+            #     [r['color'], r['material'], r['quality'], f"{float(r['rate']):.2f}"]
+            #     for r in results
+            # ]
+
+            # Table for sqlite
             table_data = [
-                [r['color'], r['material'], r['quality'], f"{float(r['rate']):.2f}"]
+                [r[1], r[2], r[3], f"{float(r[4]):.2f}"]
                 for r in results
             ]
             headers = ["Color", "Material", "Quality", "Rate"]

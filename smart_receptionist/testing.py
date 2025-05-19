@@ -1,11 +1,12 @@
 from services.receptionist import AIReceptionist
 from services.groq_service import GroqAPI
-from services.database_service import Database
+# from services.database_service import Database
+from services.sqlite_db import SqliteDatabase
 # from services.document_qa_service import DocumentQAService
 from services.read_store_vector import ReadStoreVector
 
 groq = GroqAPI()
-db = Database()
+db = SqliteDatabase()
 # document_qa_service = DocumentQAService()
 read_store_vector = ReadStoreVector()
 receptionist = AIReceptionist(groq, db, read_store_vector)
